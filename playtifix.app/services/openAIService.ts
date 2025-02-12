@@ -1,11 +1,11 @@
 import { OpenAI } from "openai";
 
 const openai = new OpenAI({
-  apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY, // Use Expo's native env handling
-  dangerouslyAllowBrowser: true, // Only enable this if running in the browser
+  apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY, 
+  dangerouslyAllowBrowser: true, 
 });
 
-// 🔹 Define the TypeScript Type for Roadmaps
+
 type Roadmap = {
   goal: string;
   timeframe: string;
@@ -15,7 +15,7 @@ type Roadmap = {
   }[];
 };
 
-// 🔹 Function to Generate Roadmap from OpenAI
+//  Function to Generate Roadmap from OpenAI
 export const generateRoadmap = async (goal: string, timeframe: string): Promise<Roadmap | null> => {
   try {
     const response = await openai.chat.completions.create({
@@ -50,7 +50,7 @@ export const generateRoadmap = async (goal: string, timeframe: string): Promise<
 
     let content = response.choices[0].message.content;
     
-    // 🔹 Remove unwanted Markdown JSON formatting if present
+    // Remove unwanted Markdown JSON formatting if present
     content = content.replace(/```json|```/g, "").trim();
 
     // 🔹 Parse and return the roadmap object

@@ -11,7 +11,7 @@ export const registerUser = async (email: string, password: string) => {
 
     console.log("User registered successfully:", user.uid);
 
-    // ✅ Store user data in Firestore safely
+    //  Store user data in Firestore safely
     try {
       await setDoc(doc(db, "users", user.uid), {
         email: user.email,
@@ -25,7 +25,7 @@ export const registerUser = async (email: string, password: string) => {
       console.error("Error saving user data to Firestore:", error);
     }
 
-    return user; // ✅ Return user even if Firestore fails
+    return user; // Return user even if Firestore fails
   } catch (error) {
     console.error("Registration error:", error);
     return null;
@@ -58,7 +58,7 @@ export const logoutUser = async () => {
   }
 };
 
-// 🔹 Get User Data from Firestore
+// Get User Data from Firestore
 export const getUserData = async (user: User) => {
   try {
     console.log("Fetching user data for:", user.uid);

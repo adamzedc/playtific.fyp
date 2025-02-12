@@ -6,13 +6,14 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { getUserData, logoutUser } from "../../services/authService";
 
 export default function HomeScreen() {
+  //user will hold User object if authenticated, data fetched when logged in
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     console.log("Checking Firebase authentication...");
-
+    //unsubscribe will be called when component unmounts (disconnect)
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         console.log("User is authenticated:", currentUser.uid);

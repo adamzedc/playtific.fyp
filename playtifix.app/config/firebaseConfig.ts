@@ -4,7 +4,7 @@ import { initializeAuth, getReactNativePersistence, getAuth, Auth } from "fireba
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
-// ✅ Firebase Config (Environment Variables from Expo)
+//Environment Variables from Expo
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -17,11 +17,10 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// ✅ Initialize Firestore & Auth
 const db = getFirestore(app);
 const auth = getAuth(app);
 //initializeAuth(app, {
- // persistence: getReactNativePersistence(AsyncStorage),
+// persistence: getReactNativePersistence(AsyncStorage),
 //});
 
 export {auth, db };

@@ -16,13 +16,13 @@ type Roadmap = {
 };
 
 export default function Page() {
-  const [goal, setGoal] = useState(""); // ✅ User input for goal
-  const [timeframe, setTimeframe] = useState(""); // ✅ User input for timeframe
+  const [goal, setGoal] = useState(""); 
+  const [timeframe, setTimeframe] = useState(""); 
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedRoadmaps, setSavedRoadmaps] = useState<Roadmap[]>([]);
 
-  // 🔹 Load Roadmaps from Firebase on App Start
+  //  Load Roadmaps from Firebase on App Start
   useEffect(() => {
     const fetchRoadmaps = async () => {
       const roadmaps = await getRoadmaps();
@@ -43,7 +43,6 @@ const handleGenerateRoadmap = async () => {
     const monthlyRoadmap = await generateRoadmap(goal, timeframe);
 
     if (monthlyRoadmap) {
-      // Store the new roadmap in component state (for immediate UI)
       setRoadmap(monthlyRoadmap);
 
       // Save the roadmap to Firestore (or any backend)
@@ -55,7 +54,6 @@ const handleGenerateRoadmap = async () => {
   } catch (error) {
     console.error("Error fetching roadmap:", error);
   } finally {
-    // Always stop the loading spinner
     setLoading(false);
   }
 };
@@ -66,7 +64,6 @@ const handleGenerateRoadmap = async () => {
         <Text style={styles.title}>AI-Powered Roadmap</Text>
         <Text style={styles.subtitle}>Enter your goal and timeframe to generate a roadmap.</Text>
 
-        {/* 🔹 User Input for Goal */}
         <TextInput
           style={styles.input}
           placeholder="Enter your goal (e.g., Learn React Native)"
@@ -74,7 +71,6 @@ const handleGenerateRoadmap = async () => {
           onChangeText={setGoal}
         />
 
-        {/* 🔹 User Input for Timeframe */}
         <TextInput
           style={styles.input}
           placeholder="Enter timeframe (e.g., 3 months)"
@@ -86,7 +82,6 @@ const handleGenerateRoadmap = async () => {
 
         {loading && <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />}
 
-        {/* 🔹 Display the Latest AI Roadmap */}
         {roadmap && (
           <View style={styles.roadmapContainer}>
             <Text style={styles.goal}>{roadmap.goal}</Text>

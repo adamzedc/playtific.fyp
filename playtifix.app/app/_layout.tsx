@@ -17,7 +17,7 @@ export default function Layout() {
 
       if (!currentUser) {
         console.log("No user found. Redirecting to login...");
-        router.replace("/auth/login"); // ✅ Redirect to login if no user
+        router.replace("/auth/login"); // Redirect to login if no user
       } else {
         console.log("User found:", currentUser.uid);
         setUser(currentUser);
@@ -39,11 +39,9 @@ export default function Layout() {
 
   return (
     <Stack>
-      {/* ✅ Authentication Screens */}
       <Stack.Screen name="auth/login" options={{ headerShown: false }} />
       <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
 
-      {/* ✅ Main App (Tab Navigation) */}
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     </Stack>
   );

@@ -1,9 +1,9 @@
 import { auth, db } from "../config/firebaseConfig";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 
-// 🔹 Define Roadmap Type
+
 type Roadmap = {
-  id?: string; // Firestore document ID (optional)
+  id?: string;
   goal: string;
   timeframe: string;
   milestones: {
@@ -12,7 +12,7 @@ type Roadmap = {
   }[];
 };
 
-// 🔹 Save Roadmap to Firestore Under the User's Document
+
 export const addRoadmap = async (roadmap: Omit<Roadmap, "id">) => {
   try {
     const user = auth.currentUser;
@@ -29,14 +29,14 @@ export const addRoadmap = async (roadmap: Omit<Roadmap, "id">) => {
       return null;
     }
 
-    // ✅ Get existing roadmaps array or initialize a new one
+    // Get existing roadmaps array or initialize a new one
     const userData = userDoc.data();
     const currentRoadmaps = userData?.roadmaps || [];
 
-    // ✅ Append the new roadmap to the existing array
+
     const updatedRoadmaps = [...currentRoadmaps, { ...roadmap, createdAt: new Date().toISOString() }];
 
-    // ✅ Update Firestore with the new roadmaps array
+    // Update Firestore with the new roadmaps array
     await updateDoc(userRef, { roadmaps: updatedRoadmaps });
 
     console.log("Roadmap added successfully for user:", user.uid);
@@ -47,7 +47,7 @@ export const addRoadmap = async (roadmap: Omit<Roadmap, "id">) => {
   }
 };
 
-// 🔹 Fetch All Roadmaps for the Logged-in User
+
 export const getUserRoadmaps = async (): Promise<Roadmap[]> => {
   try {
     const user = auth.currentUser;
