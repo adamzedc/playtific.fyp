@@ -2,7 +2,6 @@ import { auth, db } from "../config/firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, User } from "firebase/auth";
 
-
 export const registerUser = async (email: string, password: string) => {
   try {
     console.log("Attempting to register user:", email);
@@ -12,24 +11,21 @@ export const registerUser = async (email: string, password: string) => {
 
     console.log("User registered successfully:", user.uid);
 
-    // Store user data in Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      email: user.email,
-      xp: 0,
-      level: 1,
-      streak: 0,
-      roadmaps: [],
-    });
+    // ✅ Store user data in Firestore safely
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        xp: 0,
+        level: 1,
+        streak: 0,
+        roadmaps: [],
+      });
+      console.log("User data stored in Firestore.");
+    } catch (error) {
+      console.error("Error saving user data to Firestore:", error);
+    }
 
-    console.log("User data stored in Firestore:", {
-      email: user.email,
-      xp: 0,
-      level: 1,
-      streak: 0,
-      roadmaps: [],
-    });
-
-    return user;
+    return user; // ✅ Return user even if Firestore fails
   } catch (error) {
     console.error("Registration error:", error);
     return null;
