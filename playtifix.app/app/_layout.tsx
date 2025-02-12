@@ -14,7 +14,7 @@ export default function Layout() {
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       console.log("Auth state changed. Current user:", currentUser ? currentUser.uid : "No user");
-      
+
       if (!currentUser) {
         console.log("No user found. Redirecting to login...");
         router.replace("/auth/login"); // ✅ Redirect to login if no user

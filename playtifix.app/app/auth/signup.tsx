@@ -1,37 +1,44 @@
 import { useState } from "react";
 import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
 import { registerUser } from "../../services/authService";
-import { useNavigation } from "expo-router";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-
-
-type AuthStackParamList = {
-  login: undefined;
-  signup: undefined;
-};
+import { useRouter } from "expo-router"; 
 
 export default function SignupScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList, "signup">>();
+  const router = useRouter(); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSignup = async () => {
     const user = await registerUser(email, password);
     if (user) {
-      Alert.alert(" Account Created", "You can now log in.");
-      navigation.navigate("login"); //  Redirect to login screen
+      Alert.alert("Account Created", "You can now log in.");
+      router.replace("/auth/login"); 
     } else {
-      Alert.alert(" Signup Failed", "Try a different email.");
+      Alert.alert("Signup Failed", "Try a different email.");
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sign Up</Text>
-      <TextInput style={styles.input} placeholder="Email" onChangeText={setEmail} />
-      <TextInput style={styles.input} placeholder="Password" secureTextEntry onChangeText={setPassword} />
+      <Text style={styles.title}>Sign Up</Text> 
+      
+      <TextInput 
+        style={styles.input} 
+        placeholder="Email" 
+        onChangeText={setEmail} 
+      />
+      
+      <TextInput 
+        style={styles.input} 
+        placeholder="Password" 
+        secureTextEntry 
+        onChangeText={setPassword} 
+      />
+      
       <Button title="Sign Up" onPress={handleSignup} />
-      <Button title="Back to Login" onPress={() => navigation.navigate("login")} />
+
+      <Text>{"\n"}</Text> 
+      <Button title="Back to Login" onPress={() => router.push("/auth/login")} />
     </View>
   );
 }
