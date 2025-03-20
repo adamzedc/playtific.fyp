@@ -1,45 +1,49 @@
-import { Tabs } from "expo-router";
+import { Drawer } from "expo-router/drawer";
 import React from "react";
 import { Platform } from "react-native";
-//decoration for navigations
-import { HapticTab } from "@/components/HapticTab";
 import { IconSymbol } from "@/components/ui/IconSymbol";
-import TabBarBackground from "@/components/ui/TabBarBackground";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
-export default function TabLayout() {
+// 👇 Import your custom sidebar
+import CustomSidebar from "@/components/CustomSidebar"; // Adjust the path as needed
+
+export default function SidebarLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <Tabs //create tabs for the app
+    <Drawer
+      // 👇 Use custom sidebar
+      drawerContent={(props) => <CustomSidebar {...props} />}
+
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "dark"].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: { position: "absolute" }, // Transparent background for iOS
-          default: {},
-        }),
+        drawerActiveTintColor: Colors[colorScheme ?? "dark"].tint,
       }}
     >
-
-      <Tabs.Screen
+      <Drawer.Screen
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          drawerIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
 
-      <Tabs.Screen
+      <Drawer.Screen
         name="roadmap"
         options={{
           title: "Roadmap",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          drawerIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
         }}
       />
-    </Tabs>
+
+      <Drawer.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          drawerIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+        }}
+      />
+    </Drawer>
   );
 }

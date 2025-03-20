@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 
 type Roadmap = {
   id?: string;
+  name: string;
   goal: string;
   timeframe: string;
   milestones: {

@@ -1,44 +1,60 @@
 import { auth, db } from "../config/firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, User } from "firebase/auth";
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  updateProfile, 
+  User 
+} from "firebase/auth";
 
-export const registerUser = async (email: string, password: string) => {
+// Register New User
+export const registerUser = async (email: string, password: string, name: string) => {
   try {
     console.log("Attempting to register user:", email);
 
+    if (!name || name.trim() === "") {
+      throw new Error("Username cannot be empty.");
+    }
+
+    // Create User in Firebase Authentication
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
     console.log("User registered successfully:", user.uid);
 
-    //  Store user data in Firestore safely
+    // Update Firebase Authentication Profile (Set Display Name)
+    await updateProfile(user, { displayName: name });
+
+    // Store user data in Firestore
     try {
       await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
+        email: user.email || "", 
+        name: name || "Unnamed User", 
         xp: 0,
         level: 1,
         streak: 0,
         roadmaps: [],
       });
+
       console.log("User data stored in Firestore.");
     } catch (error) {
       console.error("Error saving user data to Firestore:", error);
     }
 
-    return user; // Return user even if Firestore fails
+    return user;
   } catch (error) {
     console.error("Registration error:", error);
     return null;
   }
 };
 
+// Login User
 export const loginUser = async (email: string, password: string) => {
   try {
     console.log("Attempting to log in user:", email);
-
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log("User logged in successfully:", userCredential.user.uid);
-
     return userCredential.user;
   } catch (error) {
     console.error("Login error:", error);
@@ -46,12 +62,11 @@ export const loginUser = async (email: string, password: string) => {
   }
 };
 
+// Logout User
 export const logoutUser = async () => {
   try {
     console.log("Attempting to log out user...");
-    
     await signOut(auth);
-    
     console.log("User logged out successfully.");
   } catch (error) {
     console.error("Logout error:", error);

@@ -7,9 +7,10 @@ export default function SignupScreen() {
   const router = useRouter(); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
 
   const handleSignup = async () => {
-    const user = await registerUser(email, password);
+    const user = await registerUser(email, password, name);
     if (user) {
       Alert.alert("Account Created", "You can now log in.");
       router.replace("/auth/login"); 
@@ -22,6 +23,12 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Sign Up</Text> 
       
+      <TextInput 
+        style={styles.input} 
+        placeholder="Username" 
+        onChangeText={setName}  
+      />
+
       <TextInput 
         style={styles.input} 
         placeholder="Email" 

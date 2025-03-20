@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View, Button, ScrollView, ActivityIndicator, TextInput } from "react-native";
+import { 
+  StyleSheet, Text, View, Button, ScrollView, ActivityIndicator, TextInput, Alert 
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { generateRoadmap } from "../../services/openAIService";
-import { addRoadmap, getRoadmaps } from "../../services/firebaseService";
+import { addRoadmap, getUserRoadmaps } from "../../services/firebaseService";
+import { auth } from "../../config/firebaseConfig";
 
-// 🔹 Define the Roadmap Type
 type Roadmap = {
-  id?: string; // Firestore document ID
+  id?: string;
   goal: string;
   timeframe: string;
   milestones: {
@@ -15,48 +17,66 @@ type Roadmap = {
   }[];
 };
 
-export default function Page() {
+export default function RoadmapScreen() {
   const [goal, setGoal] = useState(""); 
   const [timeframe, setTimeframe] = useState(""); 
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedRoadmaps, setSavedRoadmaps] = useState<Roadmap[]>([]);
+  const [fetchingRoadmaps, setFetchingRoadmaps] = useState(true);
 
-  //  Load Roadmaps from Firebase on App Start
+  //  Fetch Roadmaps from Firebase for the logged-in user
   useEffect(() => {
     const fetchRoadmaps = async () => {
-      const roadmaps = await getRoadmaps();
+      const user = auth.currentUser;
+      if (!user) {
+        console.error("No authenticated user.");
+        setFetchingRoadmaps(false);
+        return;
+      }
+
+      console.log("Fetching roadmaps for user:", user.uid);
+      const roadmaps = await getUserRoadmaps();
       setSavedRoadmaps(roadmaps);
+      setFetchingRoadmaps(false);
     };
+
     fetchRoadmaps();
   }, []);
-const handleGenerateRoadmap = async () => {
-  // Ensure user provided both a goal and timeframe (in months)
-  if (!goal.trim() || !timeframe.trim()) {
-    alert("Please enter both a goal and timeframe (in months).");
-    return;
-  }
 
-  setLoading(true);
-  try {
-    // Generate the monthly roadmap from the AI
-    const monthlyRoadmap = await generateRoadmap(goal, timeframe);
-
-    if (monthlyRoadmap) {
-      setRoadmap(monthlyRoadmap);
-
-      // Save the roadmap to Firestore (or any backend)
-      await addRoadmap(monthlyRoadmap);
-
-      // Update local list of saved roadmaps for the UI
-      setSavedRoadmaps((prev) => [...prev, monthlyRoadmap]);
+  // ✅ Generate Roadmap with OpenAI & Save to Firestore
+  const handleGenerateRoadmap = async () => {
+    if (!goal.trim() || !timeframe.trim()) {
+      Alert.alert("Error", "Please enter both a goal and timeframe (in months).");
+      return;
     }
-  } catch (error) {
-    console.error("Error fetching roadmap:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to generate a roadmap.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const monthlyRoadmap = await generateRoadmap(goal, timeframe);
+
+      if (monthlyRoadmap) {
+        setRoadmap(monthlyRoadmap);
+        
+        // Save the roadmap under the logged-in user’s Firestore document
+        await addRoadmap(monthlyRoadmap);
+
+        // Update local list of saved roadmaps
+        setSavedRoadmaps((prev) => [...prev, monthlyRoadmap]);
+      }
+    } catch (error) {
+      console.error("Error fetching roadmap:", error);
+      Alert.alert("Error", "Failed to generate roadmap. Try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -75,6 +95,7 @@ const handleGenerateRoadmap = async () => {
           style={styles.input}
           placeholder="Enter timeframe (e.g., 3 months)"
           value={timeframe}
+          keyboardType="numeric"
           onChangeText={setTimeframe}
         />
 
@@ -98,15 +119,20 @@ const handleGenerateRoadmap = async () => {
           </View>
         )}
 
-        {/* 🔹 Display Saved Roadmaps from Firebase */}
         <Text style={styles.savedRoadmapsTitle}>Saved Roadmaps</Text>
-        {savedRoadmaps.length === 0 && <Text>No saved roadmaps found.</Text>}
-        {savedRoadmaps.map((roadmap, index) => (
-          <View key={roadmap.id || index} style={styles.roadmapContainer}>
-            <Text style={styles.goal}>{roadmap.goal}</Text>
-            <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
-          </View>
-        ))}
+
+        {fetchingRoadmaps ? (
+          <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
+        ) : savedRoadmaps.length === 0 ? (
+          <Text>No saved roadmaps found.</Text>
+        ) : (
+          savedRoadmaps.map((roadmap, index) => (
+            <View key={roadmap.id || `roadmap-${index}`} style={styles.roadmapContainer}>
+              <Text style={styles.goal}>{roadmap.goal}</Text>
+              <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
+            </View>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );

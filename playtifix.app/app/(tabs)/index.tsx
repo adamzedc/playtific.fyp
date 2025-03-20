@@ -1,19 +1,30 @@
 import { useEffect, useState } from "react";
-import { View, Text, Button, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import * as Progress from "react-native-progress";
+import { useNavigation } from "@react-navigation/native";
+import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { auth } from "../../config/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { getUserData, logoutUser } from "../../services/authService";
 
+// Define Drawer Navigation Type
+type DrawerParamList = {
+  Home: undefined;
+  Roadmap: undefined;
+  Login: undefined;
+};
+
 export default function HomeScreen() {
-  //user will hold User object if authenticated, data fetched when logged in
+  // Use drawer navigation
+  const navigation = useNavigation<DrawerNavigationProp<DrawerParamList>>();
+
+  // User authentication state
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     console.log("Checking Firebase authentication...");
-    //unsubscribe will be called when component unmounts (disconnect)
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         console.log("User is authenticated:", currentUser.uid);
@@ -44,18 +55,6 @@ export default function HomeScreen() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogout = async () => {
-    console.log("Attempting to log out...");
-    try {
-      await logoutUser();
-      console.log("User logged out successfully.");
-      setUser(null);
-      setUserData(null);
-    } catch (error) {
-      console.error("Error logging out:", error);
-    }
-  };
-
   if (loading) {
     console.log("Loading user data...");
     return (
@@ -68,9 +67,17 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Open Drawer Button */}
+      <TouchableOpacity 
+        style={styles.menuButton} 
+        onPress={() => navigation.openDrawer()}
+      >
+        <Text style={styles.menuText}>☰ </Text>
+      </TouchableOpacity>
+
       {user && userData ? (
         <View style={styles.profileCard}>
-          <Text style={styles.username}>{userData.email}</Text>
+          <Text style={styles.username}>{userData.name}</Text>
           <Text>Level {userData.level}</Text>
           <Progress.Bar 
             progress={userData.xp / 1000} 
@@ -79,17 +86,50 @@ export default function HomeScreen() {
           />
           <Text>{userData.xp} / 1000 XP</Text>
           <Text>Streak: {userData.streak} days</Text>
-          <Button title="Logout" onPress={handleLogout} />
         </View>
       ) : (
-        <Text>No user data available. Please log in.</Text>
+        <View>
+          <Text>No user data available. Please log in.</Text>
+          <Button title="Login" onPress={() => navigation.navigate("Login")} />
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
-  profileCard: { width: "90%", padding: 15, backgroundColor: "#f8f8f8", borderRadius: 10, marginBottom: 20, alignItems: "center" },
-  username: { fontSize: 24, fontWeight: "bold" },
+  container: { 
+    flex: 1, 
+    alignItems: "center", 
+    justifyContent: "flex-start", 
+    padding: 50,
+    backgroundColor: "#fff" 
+  },
+  menuButton: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    padding: 10,
+  },
+  menuText: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  profileCard: { 
+    width: "90%", 
+    padding: 15, 
+    backgroundColor: "#f8f8f8", 
+    borderRadius: 10, 
+    marginBottom: 20, 
+    alignItems: "center" 
+  },
+  username: { 
+    fontSize: 24, 
+    fontWeight: "bold" 
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });
