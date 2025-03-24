@@ -91,12 +91,37 @@ export const getUserRoadmaps = async (): Promise<Roadmap[]> => {
   }
 };
 
-// 🔹 Toggle Task Completion (Update XP as well)
-export const toggleTaskCompletion = async (
-  roadmapIndex: number,
-  milestoneIndex: number,
-  taskIndex: number
-) => {
+// 🔹 Utility Function to Check for New Week
+export function isNewWeek(timestamp: string): boolean {
+  const lastAssigned = new Date(timestamp);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - lastAssigned.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays >= 7;
+}
+
+// 🔹 Find the Next Task to Assign
+export function findNextTask(roadmaps: Roadmap[]): any | null {
+  for (let roadmapIndex = 0; roadmapIndex < roadmaps.length; roadmapIndex++) {
+    const milestones = roadmaps[roadmapIndex].milestones;
+    for (let milestoneIndex = 0; milestoneIndex < milestones.length; milestoneIndex++) {
+      const tasks = milestones[milestoneIndex].tasks;
+      for (let taskIndex = 0; taskIndex < tasks.length; taskIndex++) {
+        if (!tasks[taskIndex].completed) {
+          return {
+            roadmapIndex,
+            milestoneIndex,
+            taskIndex,
+            title: tasks[taskIndex].title,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// 🔹 Set the First Weekly Task if None Exists
+export const setInitialWeeklyTask = async () => {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error("No authenticated user.");
@@ -108,39 +133,92 @@ export const toggleTaskCompletion = async (
 
     const userData = userDoc.data();
     const roadmaps = userData?.roadmaps || [];
+    const currentWeeklyTask = userData?.currentWeeklyTask;
 
-    const roadmap = roadmaps[roadmapIndex];
-    const milestone = roadmap.milestones[milestoneIndex];
-    const task = milestone.tasks[taskIndex];
-
-    // Toggle task completion
-    task.completed = !task.completed;
-
-    // Update XP based on task completion
-    let newXP = userData.xp || 0;
-    let newLevel = userData.level || 1;
-
-    if (task.completed) {
-      newXP += 500;
-      if (newXP >= 1000) {
-        newXP -= 1000;
-        newLevel += 1;
+    if (!currentWeeklyTask) {
+      const nextTask = findNextTask(roadmaps);
+      if (nextTask) {
+        await setWeeklyTask(nextTask);
+        console.log("Initial weekly task set:", nextTask);
       }
-    } else {
-      newXP = Math.max(0, newXP - 500);
     }
+  } catch (error) {
+    console.error("Error setting initial weekly task:", error);
+  }
+};
 
-    // Update Firestore
+// 🔹 Complete the Current Weekly Task
+export const completeWeeklyTask = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error("No authenticated user.");
+
+    const userRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) throw new Error("User document not found.");
+
+    const userData = userDoc.data();
+    const roadmaps = userData?.roadmaps || [];
+    const currentWeeklyTask = userData?.currentWeeklyTask;
+
+    if (!currentWeeklyTask) throw new Error("No current weekly task found.");
+
+    const { roadmapIndex, milestoneIndex, taskIndex } = currentWeeklyTask;
+    roadmaps[roadmapIndex].milestones[milestoneIndex].tasks[taskIndex].completed = true;
+
+    const nextTask = findNextTask(roadmaps);
     await updateDoc(userRef, {
-      roadmaps: roadmaps,
-      xp: newXP,
-      level: newLevel,
+      roadmaps,
+      currentWeeklyTask: nextTask ? { ...nextTask, assignedAt: new Date().toISOString() } : null,
     });
 
-    console.log(`Task toggled: ${task.title} - Completed: ${task.completed}`);
-    return { xp: newXP, level: newLevel };
+    console.log("Weekly task completed and new task set.");
   } catch (error) {
-    console.error("Error toggling task completion:", error);
-    return null;
+    console.error("Error completing weekly task:", error);
+  }
+};
+
+// 🔹 Skip the Current Weekly Task
+export const skipWeeklyTask = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error("No authenticated user.");
+
+    const userRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) throw new Error("User document not found.");
+
+    const userData = userDoc.data();
+    const roadmaps = userData?.roadmaps || [];
+    const nextTask = findNextTask(roadmaps);
+
+    await updateDoc(userRef, {
+      currentWeeklyTask: nextTask ? { ...nextTask, assignedAt: new Date().toISOString() } : null,
+    });
+
+    console.log("Weekly task skipped and new task set.");
+  } catch (error) {
+    console.error("Error skipping weekly task:", error);
+  }
+};
+
+// 🔹 Set a New Weekly Task in Firestore
+export const setWeeklyTask = async (newTask: any) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error("No authenticated user.");
+
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, {
+      currentWeeklyTask: {
+        ...newTask,
+        assignedAt: new Date().toISOString(),
+      },
+    });
+    console.log("Weekly task set successfully.");
+  } catch (error) {
+    console.error("Error setting weekly task:", error);
   }
 };
