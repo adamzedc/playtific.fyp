@@ -1,24 +1,15 @@
 import { useEffect, useState } from "react";
-import { View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView } from "react-native";
 import * as Progress from "react-native-progress";
 import { useNavigation } from "@react-navigation/native";
-import { DrawerNavigationProp } from "@react-navigation/drawer";
+import { DrawerActions } from "@react-navigation/native";
 import { auth } from "../../config/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { getUserData, logoutUser } from "../../services/authService";
-
-// Define Drawer Navigation Type
-type DrawerParamList = {
-  Home: undefined;
-  Roadmap: undefined;
-  Login: undefined;
-};
+import Checklist from "../../components/Checklist";
 
 export default function HomeScreen() {
-  // Use drawer navigation
-  const navigation = useNavigation<DrawerNavigationProp<DrawerParamList>>();
-
-  // User authentication state
+  const navigation = useNavigation();
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +24,7 @@ export default function HomeScreen() {
         try {
           console.log("Fetching user data...");
           const data = await getUserData(currentUser);
-          
+
           if (data) {
             console.log("User data fetched successfully:", data);
             setUserData(data);
@@ -56,7 +47,6 @@ export default function HomeScreen() {
   }, []);
 
   if (loading) {
-    console.log("Loading user data...");
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -66,13 +56,12 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Open Drawer Button */}
+    <ScrollView style={styles.container}>
       <TouchableOpacity 
         style={styles.menuButton} 
-        onPress={() => navigation.openDrawer()}
+        onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
       >
-        <Text style={styles.menuText}>☰ </Text>
+        <Text style={styles.menuText}>☰</Text>
       </TouchableOpacity>
 
       {user && userData ? (
@@ -86,6 +75,12 @@ export default function HomeScreen() {
           />
           <Text>{userData.xp} / 1000 XP</Text>
           <Text>Streak: {userData.streak} days</Text>
+
+          {userData.roadmaps?.map((roadmap: any, index: number) => (
+            <View key={index} style={styles.roadmapContainer}>
+              <Checklist roadmap={roadmap} roadmapIndex={index} />
+            </View>
+          ))}
         </View>
       ) : (
         <View>
@@ -93,16 +88,14 @@ export default function HomeScreen() {
           <Button title="Login" onPress={() => navigation.navigate("Login")} />
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    alignItems: "center", 
-    justifyContent: "flex-start", 
-    padding: 50,
+    padding: 20, 
     backgroundColor: "#fff" 
   },
   menuButton: {
@@ -116,7 +109,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   profileCard: { 
-    width: "90%", 
+    width: "100%", 
     padding: 15, 
     backgroundColor: "#f8f8f8", 
     borderRadius: 10, 
@@ -127,9 +120,7 @@ const styles = StyleSheet.create({
     fontSize: 24, 
     fontWeight: "bold" 
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+  roadmapContainer: {
+    marginVertical: 10,
   },
 });

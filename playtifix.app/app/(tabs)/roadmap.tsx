@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { generateRoadmap } from "../../services/openAIService";
 import { addRoadmap, getUserRoadmaps } from "../../services/firebaseService";
 import { auth } from "../../config/firebaseConfig";
+import { useNavigation } from "@react-navigation/native";
 
 type Roadmap = {
   id?: string;
@@ -24,6 +25,8 @@ export default function RoadmapScreen() {
   const [loading, setLoading] = useState(false);
   const [savedRoadmaps, setSavedRoadmaps] = useState<Roadmap[]>([]);
   const [fetchingRoadmaps, setFetchingRoadmaps] = useState(true);
+
+  const navigation = useNavigation();
 
   //  Fetch Roadmaps from Firebase for the logged-in user
   useEffect(() => {
@@ -69,6 +72,8 @@ export default function RoadmapScreen() {
 
         // Update local list of saved roadmaps
         setSavedRoadmaps((prev) => [...prev, monthlyRoadmap]);
+
+        Alert.alert("Success", "Roadmap generated and saved!");
       }
     } catch (error) {
       console.error("Error fetching roadmap:", error);

@@ -1,23 +1,18 @@
 import { Drawer } from "expo-router/drawer";
 import React from "react";
-import { Platform } from "react-native";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
-
-// 👇 Import your custom sidebar
-import CustomSidebar from "@/components/CustomSidebar"; // Adjust the path as needed
+import CustomSidebar from "@/components/CustomSidebar";  // Import the custom sidebar
 
 export default function SidebarLayout() {
   const colorScheme = useColorScheme();
 
   return (
     <Drawer
-      // 👇 Use custom sidebar
-      drawerContent={(props) => <CustomSidebar {...props} />}
-
+      drawerContent={(props) => <CustomSidebar {...props} />}  // Use custom sidebar
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
         drawerActiveTintColor: Colors[colorScheme ?? "dark"].tint,
       }}
     >
@@ -28,7 +23,6 @@ export default function SidebarLayout() {
           drawerIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
-
       <Drawer.Screen
         name="roadmap"
         options={{
@@ -36,7 +30,6 @@ export default function SidebarLayout() {
           drawerIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
         }}
       />
-
       <Drawer.Screen
         name="profile"
         options={{
