@@ -147,7 +147,7 @@ export const setInitialWeeklyTask = async () => {
   }
 };
 
-// 🔹 Complete the Current Weekly Task
+// 🔹 Complete the Current Weekly Task with Streak Handling
 export const completeWeeklyTask = async () => {
   try {
     const user = auth.currentUser;
@@ -164,20 +164,56 @@ export const completeWeeklyTask = async () => {
 
     if (!currentWeeklyTask) throw new Error("No current weekly task found.");
 
+    // Mark the current weekly task as completed
     const { roadmapIndex, milestoneIndex, taskIndex } = currentWeeklyTask;
     roadmaps[roadmapIndex].milestones[milestoneIndex].tasks[taskIndex].completed = true;
 
+    // Calculate XP and Level
+    let newXP = userData.xp || 0;
+    let newLevel = userData.level || 1;
+    let newStreak = userData.streak || 0;
+    let lastCompletedAt = userData.lastTaskCompletedAt ? new Date(userData.lastTaskCompletedAt) : null;
+    const now = new Date();
+    const dayDifference = lastCompletedAt ? Math.floor((now.getTime() - lastCompletedAt.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+    // Streak Logic
+    if (lastCompletedAt && dayDifference === 1) {
+      newStreak += 1;  // Increase streak
+    } else if (!lastCompletedAt || dayDifference > 1) {
+      newStreak = 1;  // Reset streak
+    }
+
+    // Calculate XP with Streak Multiplier
+    const streakMultiplier = 1 + (newStreak * 0.05);  // 5% per streak day
+    const baseXP = 1000;
+    const xpGained = Math.floor(baseXP * streakMultiplier);
+    newXP += xpGained;
+
+    // Level up if XP exceeds threshold
+    while (newXP >= 1000) {
+      newXP -= 1000;
+      newLevel += 1;
+    }
+
+    // Find and set the next task
     const nextTask = findNextTask(roadmaps);
     await updateDoc(userRef, {
-      roadmaps,
+      roadmaps: roadmaps,
+      xp: newXP,
+      level: newLevel,
+      streak: newStreak,
+      lastTaskCompletedAt: now.toISOString(),
       currentWeeklyTask: nextTask ? { ...nextTask, assignedAt: new Date().toISOString() } : null,
     });
 
-    console.log("Weekly task completed and new task set.");
+    console.log(`Task completed! XP: ${newXP}, Level: ${newLevel}, Streak: ${newStreak}, XP Gained: ${xpGained}`);
+    return { xp: newXP, level: newLevel, streak: newStreak };
   } catch (error) {
     console.error("Error completing weekly task:", error);
+    return null;
   }
 };
+
 
 // 🔹 Skip the Current Weekly Task
 export const skipWeeklyTask = async () => {
