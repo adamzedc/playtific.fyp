@@ -40,7 +40,8 @@ export default function RoadmapScreen() {
 
       console.log("Fetching roadmaps for user:", user.uid);
       const roadmaps = await getUserRoadmaps();
-      setSavedRoadmaps(roadmaps);
+      setSavedRoadmaps(roadmaps || []);
+      console.log("Fetched roadmaps:", roadmaps);
       setFetchingRoadmaps(false);
     };
 
@@ -108,7 +109,7 @@ export default function RoadmapScreen() {
 
         {loading && <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />}
 
-        {roadmap && (
+        {roadmap && roadmap.milestones && roadmap.milestones.length > 0 && (
           <View style={styles.roadmapContainer}>
             <Text style={styles.goal}>{roadmap.goal}</Text>
             <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
@@ -128,7 +129,7 @@ export default function RoadmapScreen() {
 
         {fetchingRoadmaps ? (
           <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
-        ) : savedRoadmaps.length === 0 ? (
+        ) : (savedRoadmaps && savedRoadmaps.length === 0 ? (
           <Text>No saved roadmaps found.</Text>
         ) : (
           savedRoadmaps.map((roadmap, index) => (
@@ -137,7 +138,7 @@ export default function RoadmapScreen() {
               <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
             </View>
           ))
-        )}
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

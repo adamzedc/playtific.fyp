@@ -1,82 +1,98 @@
 import { useEffect, useState } from "react";
 import { 
-  View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Alert 
+  View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Alert, FlatList 
 } from "react-native";
 import * as Progress from "react-native-progress";
 import { useNavigation } from "@react-navigation/native";
 import { DrawerActions } from "@react-navigation/native";
-import { auth } from "../../config/firebaseConfig";
+import { auth, firestore } from "../../config/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import { getUserData, logoutUser } from "../../services/authService";
-import { completeWeeklyTask, skipWeeklyTask, setInitialWeeklyTask } from "../../services/firebaseService"; // Fixed import
+import { completeWeeklyTask, skipWeeklyTask, setInitialWeeklyTask } from "../../services/firebaseService";
 import Checklist from "../../components/Checklist";
-import WeeklyTask from "../../components/WeeklyTask";  // Import the WeeklyTask component
+import WeeklyTask from "../../components/WeeklyTask";
+import { format } from "date-fns";
+import * as Animatable from 'react-native-animatable';
+
 
 export default function HomeScreen() {
   const navigation = useNavigation();
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showRoadmap, setShowRoadmap] = useState(false); // Toggle state for full roadmap
+  const [dailyTasks, setDailyTasks] = useState<any[]>([]);
 
-  // Inside your useEffect or wherever you fetch user data
-useEffect(() => {
-  console.log("Checking Firebase authentication...");
-  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    if (currentUser) {
-      console.log("User is authenticated:", currentUser.uid);
-      setUser(currentUser);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
 
-      try {
-        console.log("Fetching user data...");
-        const data = await getUserData(currentUser);
+        try {
+          const data = await getUserData(currentUser);
 
-        if (data) {
-          console.log("User data fetched successfully:", data);
-          setUserData(data);
-
-          // 🔥 Check if current weekly task is set, if not, set it
-          if (!data.currentWeeklyTask) {
-            console.log("No weekly task found, setting initial task...");
-            await setInitialWeeklyTask();
-            const refreshedData = await getUserData(currentUser);
-            setUserData(refreshedData);
+          if (data) {
+            setUserData(data);
+            if (!data.currentWeeklyTask) {
+              await setInitialWeeklyTask();
+              const refreshedData = await getUserData(currentUser);
+              setUserData(refreshedData);
+            }
+          } else {
+            setUserData(null);
           }
-        } else {
-          console.log("No user data found in Firestore.");
-          setUserData(null);
+        } catch (error) {
+          console.error("Error fetching user data:", error);
         }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
+      } else {
+        setUser(null);
+        setUserData(null);
       }
-    } else {
-      console.log("No authenticated user.");
-      setUser(null);
-      setUserData(null);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchTodaysTasks(user.uid);
     }
-    setLoading(false);
-  });
+  }, [user]);
 
-  return () => unsubscribe();
-}, []);
-
-
-  // Toggle function for showing the roadmap
-  const toggleRoadmap = () => {
-    setShowRoadmap((prev) => !prev);
-  };
-
-  // Refresh User Data
-  const refreshUserData = async () => {
+  const fetchTodaysTasks = async (userId: string) => {
     try {
-      const data = await getUserData(auth.currentUser);
-      setUserData(data);
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const dailyTasksRef = collection(firestore, `users/${userId}/dailyTasks`);
+      const q = query(dailyTasksRef, where("taskDate", "==", today));
+      const querySnapshot = await getDocs(q);
+
+      const loadedTasks: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        loadedTasks.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      setDailyTasks(loadedTasks);
     } catch (error) {
-      console.error("Error refreshing user data:", error);
+      console.error("Error fetching today's tasks:", error);
     }
   };
 
-  // Handle Task Completion
+  const markTaskAsCompleted = async (taskId: string) => {
+    try {
+      const taskDocRef = doc(firestore, `users/${user?.uid}/dailyTasks/${taskId}`);
+      await updateDoc(taskDocRef, { isCompleted: true });
+
+      setDailyTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === taskId ? { ...task, isCompleted: true } : task
+        )
+      );
+    } catch (error) {
+      console.error("Error updating task:", error);
+    }
+  };
+
   const handleCompleteTask = async () => {
     try {
       await completeWeeklyTask();
@@ -88,7 +104,6 @@ useEffect(() => {
     }
   };
 
-  // Handle Task Skipping
   const handleSkipTask = async () => {
     try {
       await skipWeeklyTask();
@@ -97,6 +112,15 @@ useEffect(() => {
     } catch (error) {
       console.error("Error skipping task:", error);
       Alert.alert("Error", "Failed to skip the task.");
+    }
+  };
+
+  const refreshUserData = async () => {
+    try {
+      const data = await getUserData(auth.currentUser);
+      setUserData(data);
+    } catch (error) {
+      console.error("Error refreshing user data:", error);
     }
   };
 
@@ -130,24 +154,45 @@ useEffect(() => {
           <Text>{userData.xp} / 1000 XP</Text>
           <Text>Streak: {userData.streak} days</Text>
 
-          {/* Weekly Task Section - Using Component */}
+          {/* Daily Tasks Section */}
+          <View style={{ marginTop: 20, width: '100%' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Today's Tasks</Text>
+            {dailyTasks.length === 0 ? (
+              <Text>No tasks for today! 🎉</Text>
+            ) : (
+              <FlatList
+                data={dailyTasks}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <Animatable.View
+                    animation={item.isCompleted ? "fadeIn" : undefined}
+                    duration={500}
+                    style={[styles.taskCard, item.isCompleted && styles.taskCompleted]}
+                  >
+                    <Text style={styles.taskText}>{item.taskDescription}</Text>
+                    {!item.isCompleted && (
+                      <TouchableOpacity
+                        style={styles.completeButton}
+                        onPress={() => markTaskAsCompleted(item.id)}
+                      >
+                        <Text style={styles.buttonText}>Complete</Text>
+                      </TouchableOpacity>
+                    )}
+                    {item.isCompleted && <Text style={styles.completedText}>Completed</Text>}
+                  </Animatable.View>
+
+                )}
+              />
+            )}
+          </View>
+
+          {/* Weekly Task Section */}
           <WeeklyTask
             taskTitle={userData.currentWeeklyTask?.title || ""}
             onComplete={handleCompleteTask}
             onSkip={handleSkipTask}
           />
 
-          {/* Toggle Button for Roadmap */}
-          <TouchableOpacity style={styles.toggleButton} onPress={toggleRoadmap}>
-            <Text style={styles.toggleButtonText}>{showRoadmap ? "Hide Roadmap" : "View Full Roadmap"}</Text>
-          </TouchableOpacity>
-
-          {/* Collapsible Roadmap */}
-          {showRoadmap && userData.roadmaps?.map((roadmap: any, index: number) => (
-            <View key={index} style={styles.roadmapContainer}>
-              <Checklist roadmap={roadmap} roadmapIndex={index} />
-            </View>
-          ))}
         </View>
       ) : (
         <View>
@@ -187,17 +232,34 @@ const styles = StyleSheet.create({
     fontSize: 24, 
     fontWeight: "bold" 
   },
-  toggleButton: {
-    marginTop: 10,
+  taskCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  taskCompleted: {
+    backgroundColor: '#d3ffd3',
+  },
+  taskText: {
+    flex: 1,
+    fontSize: 16,
+  },
+  completeButton: {
+    backgroundColor: '#4CAF50',
     padding: 10,
-    backgroundColor: "#007AFF",
-    borderRadius: 5,
+    borderRadius: 8,
+    marginLeft: 10,
   },
-  toggleButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
-  roadmapContainer: {
-    marginVertical: 10,
-  },
+  completedText: {
+    color: 'green',
+    fontWeight: 'bold',
+  }
 });
