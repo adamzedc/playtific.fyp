@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
-import { 
-  StyleSheet, Text, View, Button, ScrollView, ActivityIndicator, TextInput, Alert 
+import {
+  StyleSheet,
+  Text,
+  View,
+  Button,
+  ScrollView,
+  ActivityIndicator,
+  TextInput,
+  Alert,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { generateRoadmap } from "../../services/openAIService";
-import { addRoadmap, getUserRoadmaps } from "../../services/firebaseService";
+import { addRoadmap, getUserRoadmaps, setWeeklyTask } from "../../services/firebaseService";
 import { auth } from "../../config/firebaseConfig";
 import { useNavigation } from "@react-navigation/native";
 
@@ -19,16 +27,17 @@ type Roadmap = {
 };
 
 export default function RoadmapScreen() {
-  const [goal, setGoal] = useState(""); 
-  const [timeframe, setTimeframe] = useState(""); 
+  const [goal, setGoal] = useState("");
+  const [timeframe, setTimeframe] = useState("");
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedRoadmaps, setSavedRoadmaps] = useState<Roadmap[]>([]);
   const [fetchingRoadmaps, setFetchingRoadmaps] = useState(true);
+  const [showSaved, setShowSaved] = useState(false);
+  const [expandedIndexes, setExpandedIndexes] = useState<number[]>([]);
 
   const navigation = useNavigation();
 
-  //  Fetch Roadmaps from Firebase for the logged-in user
   useEffect(() => {
     const fetchRoadmaps = async () => {
       const user = auth.currentUser;
@@ -48,7 +57,6 @@ export default function RoadmapScreen() {
     fetchRoadmaps();
   }, []);
 
-  // ✅ Generate Roadmap with OpenAI & Save to Firestore
   const handleGenerateRoadmap = async () => {
     if (!goal.trim() || !timeframe.trim()) {
       Alert.alert("Error", "Please enter both a goal and timeframe (in months).");
@@ -67,11 +75,16 @@ export default function RoadmapScreen() {
 
       if (monthlyRoadmap) {
         setRoadmap(monthlyRoadmap);
-        
-        // Save the roadmap under the logged-in user’s Firestore document
+
         await addRoadmap(monthlyRoadmap);
 
-        // Update local list of saved roadmaps
+        await setWeeklyTask({
+          title: monthlyRoadmap.goal,
+          roadmapIndex: savedRoadmaps.length,
+          milestoneIndex: 0,
+          taskIndex: 0,
+        });
+
         setSavedRoadmaps((prev) => [...prev, monthlyRoadmap]);
 
         Alert.alert("Success", "Roadmap generated and saved!");
@@ -82,6 +95,12 @@ export default function RoadmapScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleExpand = (index: number) => {
+    setExpandedIndexes((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+    );
   };
 
   return (
@@ -125,20 +144,36 @@ export default function RoadmapScreen() {
           </View>
         )}
 
-        <Text style={styles.savedRoadmapsTitle}>Saved Roadmaps</Text>
+        <Pressable onPress={() => setShowSaved(!showSaved)} style={styles.expandButton}>
+          <Text style={styles.expandButtonText}>{showSaved ? "Hide" : "Show"} Saved Roadmaps</Text>
+        </Pressable>
 
-        {fetchingRoadmaps ? (
-          <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
-        ) : (savedRoadmaps && savedRoadmaps.length === 0 ? (
-          <Text>No saved roadmaps found.</Text>
-        ) : (
-          savedRoadmaps.map((roadmap, index) => (
-            <View key={roadmap.id || `roadmap-${index}`} style={styles.roadmapContainer}>
-              <Text style={styles.goal}>{roadmap.goal}</Text>
-              <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
-            </View>
-          ))
-        ))}
+        {showSaved && (
+          <View style={styles.roadmapContainer}>
+            {fetchingRoadmaps ? (
+              <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
+            ) : (savedRoadmaps && savedRoadmaps.length === 0 ? (
+              <Text>No saved roadmaps found.</Text>
+            ) : (
+              savedRoadmaps.map((roadmap, index) => (
+                <View key={roadmap.id || `roadmap-${index}`} style={styles.roadmapContainer}>
+                  <Pressable onPress={() => toggleExpand(index)}>
+                    <Text style={styles.goal}>{roadmap.goal}</Text>
+                    <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
+                  </Pressable>
+                  {expandedIndexes.includes(index) && roadmap.milestones.map((milestone, mIndex) => (
+                    <View key={mIndex} style={styles.milestone}>
+                      <Text style={styles.milestoneTitle}>{milestone.name}</Text>
+                      {milestone.tasks.map((task, tIndex) => (
+                        <Text key={tIndex} style={styles.task}>• {typeof task === 'string' ? task : task.title}</Text>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              ))
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -217,5 +252,16 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 30,
     marginBottom: 10,
+  },
+  expandButton: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  expandButtonText: {
+    color: "white",
+    fontWeight: "bold",
   },
 });

@@ -1,15 +1,15 @@
+// authService.ts
+
 import { auth, db } from "../config/firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  updateProfile, 
-  User 
-} from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, User,} from "firebase/auth";
 
 // Register New User
-export const registerUser = async (email: string, password: string, name: string) => {
+export const registerUser = async (
+  email: string,
+  password: string,
+  name: string
+) => {
   try {
     console.log("Attempting to register user:", email);
 
@@ -17,31 +17,32 @@ export const registerUser = async (email: string, password: string, name: string
       throw new Error("Username cannot be empty.");
     }
 
-    // Create User in Firebase Authentication
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // 1) Create user in Firebase Auth
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
     const user = userCredential.user;
-
     console.log("User registered successfully:", user.uid);
 
-    // Update Firebase Authentication Profile (Set Display Name)
+    // 2) Set display name in Auth profile
     await updateProfile(user, { displayName: name });
 
-    // Store user data in Firestore
-    try {
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email || "", 
-        name: name || "Unnamed User", 
-        xp: 0,
-        level: 1,
-        streak: 0,
-        roadmaps: [],
-      });
+    // 3) Store initial user data in Firestore
+    //    — note: we remove the old `streak` field and replace it with `dailyStreak`
+    await setDoc(doc(db, "users", user.uid), {
+      email: user.email || "",
+      name: name,
+      xp: 0,
+      level: 1,
+      dailyStreak: 0,
+      lastDailyTaskCompletedAt: null,
+      roadmaps: [],
+      currentWeeklyTask: null,
+    });
 
-      console.log("User data stored in Firestore.");
-    } catch (error) {
-      console.error("Error saving user data to Firestore:", error);
-    }
-
+    console.log("User data stored in Firestore.");
     return user;
   } catch (error) {
     console.error("Registration error:", error);
@@ -53,7 +54,11 @@ export const registerUser = async (email: string, password: string, name: string
 export const loginUser = async (email: string, password: string) => {
   try {
     console.log("Attempting to log in user:", email);
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
     console.log("User logged in successfully:", userCredential.user.uid);
     return userCredential.user;
   } catch (error) {

@@ -1,20 +1,38 @@
+// index.tsx
+
 import { useEffect, useState } from "react";
-import { 
-  View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView, Alert, FlatList 
+import {
+  View,
+  Text,
+  Button,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  FlatList,
 } from "react-native";
 import * as Progress from "react-native-progress";
-import { useNavigation } from "@react-navigation/native";
-import { DrawerActions } from "@react-navigation/native";
-import { auth, firestore } from "../../config/firebaseConfig";
+import { useNavigation, DrawerActions } from "@react-navigation/native";
+import { auth, db } from "../../config/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
-import { getUserData, logoutUser } from "../../services/authService";
-import { completeWeeklyTask, skipWeeklyTask, setInitialWeeklyTask } from "../../services/firebaseService";
-import Checklist from "../../components/Checklist";
-import WeeklyTask from "../../components/WeeklyTask";
-import { format } from "date-fns";
-import * as Animatable from 'react-native-animatable';
-
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
+import { getUserData } from "../../services/authService";
+import {
+  completeWeeklyTask,
+  setInitialWeeklyTask,
+  setWeeklyTask,
+  completeDailyTask,
+} from "../../services/firebaseService";
+import DailyTaskItem from "../../components/DailyTaskItem";
+import { addDays, format } from "date-fns";
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -23,26 +41,23 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [dailyTasks, setDailyTasks] = useState<any[]>([]);
 
+  // Authenticate & initialize weekly task
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-
         try {
           const data = await getUserData(currentUser);
-
           if (data) {
             setUserData(data);
             if (!data.currentWeeklyTask) {
               await setInitialWeeklyTask();
-              const refreshedData = await getUserData(currentUser);
-              setUserData(refreshedData);
+              const refreshed = await getUserData(currentUser);
+              setUserData(refreshed);
             }
-          } else {
-            setUserData(null);
           }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
+        } catch (err) {
+          console.error("Error fetching user data:", err);
         }
       } else {
         setUser(null);
@@ -50,77 +65,73 @@ export default function HomeScreen() {
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
+  // Fetch today's tasks when user or weekly task changes
   useEffect(() => {
-    if (user) {
+    if (user && userData?.currentWeeklyTask) {
       fetchTodaysTasks(user.uid);
     }
-  }, [user]);
+  }, [user, userData?.currentWeeklyTask]);
 
+  // Load today's daily tasks
   const fetchTodaysTasks = async (userId: string) => {
+    setLoading(true);
     try {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const dailyTasksRef = collection(firestore, `users/${userId}/dailyTasks`);
-      const q = query(dailyTasksRef, where("taskDate", "==", today));
-      const querySnapshot = await getDocs(q);
+      const today = format(addDays(new Date(), 2), "yyyy-MM-dd");
+      const dailyRef = collection(db, `users/${userId}/dailyTasks`);
+      const q = query(dailyRef, where("taskDate", "==", today));
+      const snap = await getDocs(q);
 
-      const loadedTasks: any[] = [];
-      querySnapshot.forEach((docSnap) => {
-        loadedTasks.push({ id: docSnap.id, ...docSnap.data() });
+      const loaded: any[] = [];
+      snap.forEach((docSnap) => {
+        loaded.push({ id: docSnap.id, ...docSnap.data() });
       });
-
-      setDailyTasks(loadedTasks);
-    } catch (error) {
-      console.error("Error fetching today's tasks:", error);
+      setDailyTasks(loaded);
+    } catch (err) {
+      console.error("Error fetching today's tasks:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Complete a daily task
   const markTaskAsCompleted = async (taskId: string) => {
     try {
-      const taskDocRef = doc(firestore, `users/${user?.uid}/dailyTasks/${taskId}`);
-      await updateDoc(taskDocRef, { isCompleted: true });
-
-      setDailyTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task.id === taskId ? { ...task, isCompleted: true } : task
+      await completeDailyTask(taskId);
+      setDailyTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, isCompleted: true } : t
         )
       );
-    } catch (error) {
-      console.error("Error updating task:", error);
+    } catch (err) {
+      console.error("Error completing daily task:", err);
     }
   };
 
-  const handleCompleteTask = async () => {
+  // Advance to next weekly task manually
+  const handleNextTask = async (userId: string) => {
     try {
       await completeWeeklyTask();
-      Alert.alert("Success", "Task completed successfully!");
-      await refreshUserData();
-    } catch (error) {
-      console.error("Error completing task:", error);
-      Alert.alert("Error", "Failed to complete the task.");
-    }
-  };
 
-  const handleSkipTask = async () => {
-    try {
-      await skipWeeklyTask();
-      Alert.alert("Skipped", "Task skipped successfully!");
-      await refreshUserData();
-    } catch (error) {
-      console.error("Error skipping task:", error);
-      Alert.alert("Error", "Failed to skip the task.");
-    }
-  };
+      const updated = await getUserData(auth.currentUser!);
+      setUserData(updated);
 
-  const refreshUserData = async () => {
-    try {
-      const data = await getUserData(auth.currentUser);
-      setUserData(data);
-    } catch (error) {
-      console.error("Error refreshing user data:", error);
+      if (!updated?.currentWeeklyTask) {
+        Alert.alert("🎉 All Done!", "You’ve completed all roadmap objectives.");
+        setDailyTasks([]);
+        return;
+      }
+
+      await setWeeklyTask(updated.currentWeeklyTask);
+      await fetchTodaysTasks(userId);
+    } catch (err) {
+      console.error("Error advancing to next weekly task:", err);
+      Alert.alert(
+        "Error",
+        "Could not advance to the next task. Please try again."
+      );
     }
   };
 
@@ -135,9 +146,11 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <TouchableOpacity 
-        style={styles.menuButton} 
-        onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+      <TouchableOpacity
+        style={styles.menuButton}
+        onPress={() =>
+          navigation.dispatch(DrawerActions.openDrawer() as any)
+        }
       >
         <Text style={styles.menuText}>☰</Text>
       </TouchableOpacity>
@@ -146,17 +159,17 @@ export default function HomeScreen() {
         <View style={styles.profileCard}>
           <Text style={styles.username}>{userData.name}</Text>
           <Text>Level {userData.level}</Text>
-          <Progress.Bar 
-            progress={userData.xp / 1000} 
-            width={200} 
+          <Progress.Bar
+            progress={userData.xp / 1000}
+            width={200}
             color="#007AFF"
           />
           <Text>{userData.xp} / 1000 XP</Text>
-          <Text>Streak: {userData.streak} days</Text>
+          <Text>Streak: {userData.dailyStreak} days</Text>
 
           {/* Daily Tasks Section */}
-          <View style={{ marginTop: 20, width: '100%' }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Today's Tasks</Text>
+          <View style={styles.tasksSection}>
+            <Text style={styles.tasksTitle}>Today's Tasks</Text>
             {dailyTasks.length === 0 ? (
               <Text>No tasks for today! 🎉</Text>
             ) : (
@@ -164,40 +177,31 @@ export default function HomeScreen() {
                 data={dailyTasks}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
-                  <Animatable.View
-                    animation={item.isCompleted ? "fadeIn" : undefined}
-                    duration={500}
-                    style={[styles.taskCard, item.isCompleted && styles.taskCompleted]}
-                  >
-                    <Text style={styles.taskText}>{item.taskDescription}</Text>
-                    {!item.isCompleted && (
-                      <TouchableOpacity
-                        style={styles.completeButton}
-                        onPress={() => markTaskAsCompleted(item.id)}
-                      >
-                        <Text style={styles.buttonText}>Complete</Text>
-                      </TouchableOpacity>
-                    )}
-                    {item.isCompleted && <Text style={styles.completedText}>Completed</Text>}
-                  </Animatable.View>
-
+                  <DailyTaskItem
+                    task={item}
+                    onComplete={markTaskAsCompleted}
+                  />
                 )}
               />
             )}
+
+            {/* Next Task Button */}
+            <View style={styles.nextButtonContainer}>
+              <Button
+                title="Next Task"
+                onPress={() => handleNextTask(user.uid)}
+                color="#007AFF"
+              />
+            </View>
           </View>
-
-          {/* Weekly Task Section */}
-          <WeeklyTask
-            taskTitle={userData.currentWeeklyTask?.title || ""}
-            onComplete={handleCompleteTask}
-            onSkip={handleSkipTask}
-          />
-
         </View>
       ) : (
         <View>
           <Text>No user data available. Please log in.</Text>
-          <Button title="Login" onPress={() => navigation.navigate("Login")} />
+          <Button
+            title="Login"
+            onPress={() => navigation.navigate("Login" as any)}
+          />
         </View>
       )}
     </ScrollView>
@@ -205,10 +209,10 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    padding: 20, 
-    backgroundColor: "#fff" 
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: "#fff",
   },
   menuButton: {
     position: "absolute",
@@ -220,46 +224,28 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
   },
-  profileCard: { 
-    width: "100%", 
-    padding: 15, 
-    backgroundColor: "#f8f8f8", 
-    borderRadius: 10, 
-    marginBottom: 20, 
-    alignItems: "center" 
+  profileCard: {
+    width: "100%",
+    padding: 15,
+    backgroundColor: "#f8f8f8",
+    borderRadius: 10,
+    marginBottom: 20,
+    alignItems: "center",
   },
-  username: { 
-    fontSize: 24, 
-    fontWeight: "bold" 
+  username: {
+    fontSize: 24,
+    fontWeight: "bold",
   },
-  taskCard: {
-    backgroundColor: '#f9f9f9',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  tasksSection: {
+    marginTop: 20,
+    width: "100%",
   },
-  taskCompleted: {
-    backgroundColor: '#d3ffd3',
+  tasksTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
-  taskText: {
-    flex: 1,
-    fontSize: 16,
+  nextButtonContainer: {
+    marginTop: 20,
   },
-  completeButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 8,
-    marginLeft: 10,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  completedText: {
-    color: 'green',
-    fontWeight: 'bold',
-  }
 });
