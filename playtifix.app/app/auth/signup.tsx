@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity } from "react-native";
 import { registerUser } from "../../services/authService";
 import { useRouter } from "expo-router";
 
@@ -9,6 +9,7 @@ export default function SignupScreen() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // State to toggle password visibility
 
   const handleSignup = async () => {
     setPasswordError(""); // Clear previous error messages
@@ -77,13 +78,24 @@ export default function SignupScreen() {
         onChangeText={setEmail}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={[styles.input, styles.passwordInput]}
+          placeholder="Password"
+          secureTextEntry={!showPassword} // Toggle visibility
+          value={password}
+          onChangeText={setPassword}
+        />
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => setShowPassword((prev) => !prev)} // Toggle state
+        >
+          <Text style={styles.toggleButtonText}>
+            {showPassword ? "Hide" : "Show"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {passwordError ? (
         <Text style={styles.errorText}>{passwordError}</Text>
       ) : null}
@@ -109,6 +121,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
     marginBottom: 15,
+  },
+  passwordContainer: {
+    width: "80%",
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    marginBottom: 15,
+  },
+  passwordInput: {
+    flex: 1,
+  },
+  toggleButton: {
+    paddingHorizontal: 10,
+  },
+  toggleButtonText: {
+    color: "#007AFF",
+    fontWeight: "bold",
   },
   passwordReminder: {
     width: "80%",

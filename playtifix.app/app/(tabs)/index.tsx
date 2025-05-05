@@ -4,7 +4,7 @@ import * as Progress from "react-native-progress";
 import { useNavigation, DrawerActions } from "@react-navigation/native";
 import { auth, db } from "../../config/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, where, getDocs, doc, getDoc,} from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
 import { getUserData } from "../../services/authService";
 import { completeWeeklyTask, setInitialWeeklyTask, setWeeklyTask, completeDailyTask, resetDailyStreakIfMissed,} from "../../services/firebaseService";
 import { checkAndUnlockAchievements } from "../../services/achievementService";
@@ -150,11 +150,15 @@ export default function HomeScreen() {
   const markTaskAsCompleted = async (taskId: string) => {
     try {
       await completeDailyTask(taskId, devDayOffset);
+
+      // Update the dailyTasks state to mark the task as completed
       setDailyTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId ? { ...t, isCompleted: true } : t
-        )
+        prev.map((t) => (t.id === taskId ? { ...t, isCompleted: true } : t))
       );
+
+      // Fetch the updated user data
+      const updatedUserData = await getUserData(auth.currentUser!);
+      setUserData(updatedUserData); // Update the userData state
     } catch (err) {
       console.error("Error completing daily task:", err);
     }
@@ -163,19 +167,52 @@ export default function HomeScreen() {
   // Advance to next weekly task manually
   const handleNextTask = async (userId: string) => {
     try {
+      // Complete the current weekly task
       await completeWeeklyTask();
-
+  
+      // Fetch the updated user data
       const updated = await getUserData(auth.currentUser!);
-      setUserData(updated);
-
-      if (!updated?.currentWeeklyTask) {
-        Alert.alert("🎉 All Done!", "You’ve completed all roadmap objectives.");
-        setDailyTasks([]);
-        return;
+  
+      const now = new Date();
+      now.setDate(now.getDate() + devDayOffset); // Apply devDayOffset for testing
+  
+      const lastCompletedAt = updated?.lastDailyTaskCompletedAt
+        ? new Date(updated.lastDailyTaskCompletedAt)
+        : null;
+  
+      let newStreak = updated?.dailyStreak || 0;
+  
+      // Check if the task is completed on the same day or the next consecutive day
+      if (
+        lastCompletedAt &&
+        (now.getDate() === lastCompletedAt.getDate() + 1 &&
+          now.getMonth() === lastCompletedAt.getMonth() &&
+          now.getFullYear() === lastCompletedAt.getFullYear())
+      ) {
+        newStreak += 1; // Increment streak
+      } else if (
+        !lastCompletedAt ||
+        now.getDate() !== lastCompletedAt.getDate() ||
+        now.getMonth() !== lastCompletedAt.getMonth() ||
+        now.getFullYear() !== lastCompletedAt.getFullYear()
+      ) {
+        newStreak = 1; // Reset streak if not consecutive
       }
-
-      await setWeeklyTask(updated.currentWeeklyTask);
-      await fetchTodaysTasks(userId);
+  
+      // Update Firestore with the new streak
+      await updateDoc(doc(db, "users", userId), {
+        dailyStreak: newStreak,
+        lastDailyTaskCompletedAt: now.toISOString(),
+      });
+  
+      // Update local state
+      setUserData({
+        ...updated,
+        dailyStreak: newStreak,
+        lastDailyTaskCompletedAt: now.toISOString(),
+      });
+  
+      console.log(`✅ Weekly task complete! New streak: ${newStreak}`);
     } catch (err) {
       console.error("Error advancing to next weekly task:", err);
       Alert.alert(
@@ -184,6 +221,7 @@ export default function HomeScreen() {
       );
     }
   };
+  
 
   if (loading) {
     return (
@@ -232,7 +270,7 @@ export default function HomeScreen() {
         <Text style={styles.tasksTitle}>Today's Tasks</Text>
         <View style={styles.nextButtonContainer}>
           <Button
-            title="Next Task"
+            title="Complete current task"
             onPress={() => user && handleNextTask(user.uid)}
             color="#007AFF"
           />

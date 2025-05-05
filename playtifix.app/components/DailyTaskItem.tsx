@@ -30,7 +30,7 @@ const DailyTaskItem: React.FC<Props> = ({ task, onComplete }) => {
             <Text style={styles.buttonText}>Complete</Text>
             </TouchableOpacity>
         ) : (
-            <Text style={styles.completedText}>Completed</Text>
+            <Text style={styles.completedText}>Completed. See you tomorrow!</Text>
         )}
     </Animatable.View>
 

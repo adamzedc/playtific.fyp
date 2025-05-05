@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity } from "react-native";
 import { loginUser } from "../../services/authService";
 import { useRouter } from "expo-router";
 
@@ -8,6 +8,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false); // State to toggle password visibility
 
   const handleLogin = async () => {
     setErrorMessage(""); // Clear previous error messages
@@ -28,8 +29,6 @@ export default function LoginScreen() {
       } else {
         setErrorMessage("An unexpected error occurred. Please try again.");
       }
-      
-      
     }
   };
 
@@ -44,13 +43,23 @@ export default function LoginScreen() {
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={[styles.input, styles.passwordInput]}
+          placeholder="Password"
+          secureTextEntry={!showPassword} // Toggle visibility
+          value={password}
+          onChangeText={setPassword}
+        />
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => setShowPassword((prev) => !prev)} // Toggle state
+        >
+          <Text style={styles.toggleButtonText}>
+            {showPassword ? "Hide" : "Show"}
+          </Text>
+        </TouchableOpacity>
+      </View>
       {errorMessage ? (
         <Text style={styles.errorText}>{errorMessage}</Text>
       ) : null}
@@ -64,7 +73,31 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
-  input: { width: "80%", padding: 10, borderBottomWidth: 1, marginBottom: 10 },
+  input: {
+    width: "80%",
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    marginBottom: 15,
+  },
+  passwordContainer: {
+    width: "80%",
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    marginBottom: 15,
+  },
+  passwordInput: {
+    flex: 1,
+  },
+  toggleButton: {
+    paddingHorizontal: 10,
+  },
+  toggleButtonText: {
+    color: "#007AFF",
+    fontWeight: "bold",
+  },
   errorText: {
     color: "red",
     fontSize: 14,
