@@ -33,13 +33,23 @@ export const registerUser = async (
     //    — note: we remove the old `streak` field and replace it with `dailyStreak`
     await setDoc(doc(db, "users", user.uid), {
       email: user.email || "",
-      name: name,
+      name: name  || "Unnamed User",
       xp: 0,
       level: 1,
       dailyStreak: 0,
       lastDailyTaskCompletedAt: null,
       roadmaps: [],
       currentWeeklyTask: null,
+      achievements: {
+        firstDaily: false,
+        firstWeekly: false,
+        dailyStreak3: false,
+        dailyStreak7: false,
+        level5: false,
+        level10: false,
+        roadmapComplete: false,
+        backOnTrack: false,
+      }
     });
 
     console.log("User data stored in Firestore.");

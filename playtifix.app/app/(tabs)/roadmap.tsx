@@ -1,15 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  StyleSheet,
-  Text,
-  View,
-  Button,
-  ScrollView,
-  ActivityIndicator,
-  TextInput,
-  Alert,
-  Pressable,
-} from "react-native";
+import { StyleSheet, Text, View, Button, ScrollView, ActivityIndicator, TextInput, Alert, Pressable,} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { generateRoadmap } from "../../services/openAIService";
 import { addRoadmap, getUserRoadmaps, setWeeklyTask } from "../../services/firebaseService";

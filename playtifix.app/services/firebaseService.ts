@@ -1,6 +1,16 @@
 import { auth, db } from "../config/firebaseConfig";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch,} from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+} from "firebase/firestore";
 import { addDays, format } from "date-fns";
+import { devDayOffset } from "../config/devSettings";
+import { checkAndUnlockAchievements } from "./achievementService";
 
 // --- Types ---
 type Task = {
@@ -21,14 +31,35 @@ type Roadmap = {
   milestones: Milestone[];
 };
 
+// --- Utility ---
+export const resetDailyStreakIfMissed = async (
+  userId: string,
+  lastCompletedDate: string | null,
+  currentStreak: number,
+  devDayOffset = 0
+) => {
+  if (!lastCompletedDate || currentStreak === 0) return false;
+
+  const now = addDays(new Date(), devDayOffset);
+  const last = new Date(lastCompletedDate);
+  const delta = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (delta > 1) {
+    console.log("Missed a day! Resetting daily streak.");
+    await updateDoc(doc(db, "users", userId), { dailyStreak: 0 });
+    return true;
+  }
+  return false;
+};
+
 // --- Daily Task Generator ---
-export const generateDailyTasks = async (weeklyTaskTitle: string,userId: string) => {
+export const generateDailyTasks = async ( weeklyTaskTitle: string, userId: string) => {
   try {
     const dailyTasksRef = collection(db, `users/${userId}/dailyTasks`);
-    const today = new Date();
+    const baseDate = addDays(new Date(), devDayOffset); // Use offset for testing
 
     for (let i = 0; i < 7; i++) {
-      const taskDate = format(addDays(today, i), "yyyy-MM-dd");
+      const taskDate = format(addDays(baseDate, i), "yyyy-MM-dd");
       const taskDocRef = doc(dailyTasksRef); // auto-ID
 
       await setDoc(taskDocRef, {
@@ -39,11 +70,58 @@ export const generateDailyTasks = async (weeklyTaskTitle: string,userId: string)
       });
     }
 
-    console.log(" Daily tasks generated in Firestore.");
+    console.log("✅ Daily tasks generated in Firestore with offset:", devDayOffset);
   } catch (error) {
-    console.error(" Failed to generate daily tasks:", error);
+    console.error("❌ Failed to generate daily tasks:", error);
   }
 };
+
+export const setWeeklyTask = async ( newTask: any) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error("No authenticated user.");
+
+    const userRef = doc(db, "users", user.uid);
+    const assignedAt = addDays(new Date(), devDayOffset).toISOString(); 
+    // 1. Update weekly task pointer
+    await updateDoc(userRef, {
+      currentWeeklyTask: {
+        ...newTask,
+        assignedAt,
+      },
+    });
+
+    // 2. Clear existing daily tasks
+    const dtRef = collection(db, `users/${user.uid}/dailyTasks`);
+    const dtSnap = await getDocs(dtRef);
+    for (const d of dtSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+
+    // 3. Get the task title
+    const userDoc = await getDoc(userRef);
+    const roadmaps = userDoc.exists() ? userDoc.data()?.roadmaps || [] : [];
+    const { roadmapIndex, milestoneIndex, taskIndex } = newTask;
+    const taskTitle =
+      roadmaps[roadmapIndex]?.milestones[milestoneIndex]?.tasks[taskIndex]?.title;
+
+    if (!taskTitle) {
+      console.warn("⚠️ Task title missing. Daily task generation skipped.");
+      return;
+    }
+
+    // 4. Generate 7 daily tasks from offset
+    await generateDailyTasks(taskTitle, user.uid);
+
+    console.log("✅ Weekly task set and daily tasks generated (with offset).");
+  } catch (error) {
+    console.error("❌ Error setting weekly task:", error);
+  }
+};
+
+
+// --- Roadmap Utilities ---
+
 
 // --- Roadmap CRUD ---
 
@@ -59,13 +137,16 @@ export const addRoadmap = async (roadmap: Omit<Roadmap, "id">) => {
     const userData = userDoc.data();
     const currentRoadmaps = userData?.roadmaps || [];
 
+    // Use addDays to calculate the offset date
+    const createdAt = addDays(new Date(), devDayOffset).toISOString();
+
     const updatedRoadmap = {
       ...roadmap,
       milestones: roadmap.milestones.map((m) => ({
         ...m,
         tasks: m.tasks.map((t) => ({ title: t, completed: false })),
       })),
-      createdAt: new Date().toISOString(),
+      createdAt, // Use the offset date here
     };
 
     await updateDoc(userRef, {
@@ -79,6 +160,7 @@ export const addRoadmap = async (roadmap: Omit<Roadmap, "id">) => {
     return null;
   }
 };
+
 
 export const getUserRoadmaps = async (): Promise<Roadmap[]> => {
   try {
@@ -96,8 +178,6 @@ export const getUserRoadmaps = async (): Promise<Roadmap[]> => {
     return [];
   }
 };
-
-// --- Utility to find next incomplete task ---
 export function findNextTask(roadmaps: Roadmap[]): any | null {
   for (let ri = 0; ri < roadmaps.length; ri++) {
     const ms = roadmaps[ri].milestones;
@@ -118,8 +198,8 @@ export function findNextTask(roadmaps: Roadmap[]): any | null {
   return null;
 }
 
-// --- Weekly Task Initialization ---
-export const setInitialWeeklyTask = async () => {
+// --- Weekly Task Setup ---
+export const setInitialWeeklyTask = async (devDayOffset: number = 0) => {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error("No authenticated user.");
@@ -135,7 +215,7 @@ export const setInitialWeeklyTask = async () => {
     if (!currentWeeklyTask) {
       const nextTask = findNextTask(roadmaps);
       if (nextTask) {
-        await setWeeklyTask(nextTask);
+        await setWeeklyTask(nextTask); // Pass offset here
         console.log("Initial weekly task set:", nextTask);
       }
     }
@@ -144,65 +224,9 @@ export const setInitialWeeklyTask = async () => {
   }
 };
 
-// --- Assign & Generate Next Weekly Task ---
-export const setWeeklyTask = async (newTask: any) => {
-  try {
-    const user = auth.currentUser;
-    if (!user) throw new Error("No authenticated user.");
 
-    const userRef = doc(db, "users", user.uid);
 
-    // 1) Update currentWeeklyTask in user document
-    await updateDoc(userRef, {
-      currentWeeklyTask: {
-        ...newTask,
-        assignedAt: new Date().toISOString(),
-      },
-    });
-
-    // 2) Initialize Firestore write batch
-    const batch = writeBatch(db);
-
-    // 3) Queue deletions of all existing daily tasks
-    const dtRef = collection(db, `users/${user.uid}/dailyTasks`);
-    const dtSnap = await getDocs(dtRef);
-    dtSnap.docs.forEach((d) => batch.delete(d.ref));
-
-    // 4) Fetch roadmap to resolve the task title
-    const userDoc = await getDoc(userRef);
-    const rd = userDoc.exists() ? userDoc.data()?.roadmaps || [] : [];
-    const { roadmapIndex, milestoneIndex, taskIndex } = newTask;
-    const taskTitle =
-      rd[roadmapIndex]?.milestones[milestoneIndex]?.tasks[taskIndex]?.title;
-
-    if (!taskTitle) {
-      console.warn("⚠️ generateDailyTasks skipped: missing title");
-      await batch.commit(); // still commit the deletes
-      return;
-    }
-
-    // 5) Queue creation of 7 new daily tasks
-    const today = new Date();
-    for (let i = 0; i < 7; i++) {
-      const dateStr = format(addDays(today, i), "yyyy-MM-dd");
-      const newDoc = doc(dtRef); // auto-generated ID
-      batch.set(newDoc, {
-        weeklyTaskId: taskTitle,
-        taskDate: dateStr,
-        taskDescription: `Spend 30 minutes on: ${taskTitle}`,
-        isCompleted: false,
-      });
-    }
-
-    // 6) Commit batch
-    await batch.commit();
-    console.log("✅ Weekly task set & daily tasks regenerated (batched).");
-  } catch (error) {
-    console.error("❌ Error setting weekly task:", error);
-  }
-};
-
-// --- Complete Weekly Task (XP/Level only) ---
+// --- Complete Weekly Task ---
 export const completeWeeklyTask = async () => {
   try {
     const user = auth.currentUser;
@@ -217,29 +241,37 @@ export const completeWeeklyTask = async () => {
     const cwt = ud?.currentWeeklyTask;
     if (!cwt) throw new Error("No current weekly task found.");
 
-    // 1) Mark complete
     const { roadmapIndex, milestoneIndex, taskIndex } = cwt;
+    console.log(
+      `Marking task as completed: Roadmap ${roadmapIndex}, Milestone ${milestoneIndex}, Task ${taskIndex}`
+    );
     rms[roadmapIndex].milestones[milestoneIndex].tasks[taskIndex].completed = true;
 
-    // 2) XP & level
     let xp = ud.xp || 0;
     let lvl = ud.level || 1;
-    xp += 1000; // base XP for completing weekly
+    xp += 1000;
     while (xp >= 1000) {
       xp -= 1000;
       lvl++;
     }
 
-    // 3) Find next task
     const next = findNextTask(rms);
+    console.log("Next task found:", next);
+
     const newCwt = next ? { ...next, assignedAt: new Date().toISOString() } : null;
 
-    // 4) Update Firestore
     await updateDoc(userRef, {
       roadmaps: rms,
       xp,
       level: lvl,
       currentWeeklyTask: newCwt,
+    });
+
+    console.log("Roadmap complete:", !next);
+    await checkAndUnlockAchievements(user.uid, {
+      xp,
+      level: lvl,
+      roadmapComplete: !next,
     });
 
     console.log(`Weekly task completed! XP: ${xp}, Level: ${lvl}`);
@@ -250,7 +282,7 @@ export const completeWeeklyTask = async () => {
   }
 };
 
-// --- Complete Daily Task (XP & Daily Streak only) ---
+// --- Complete Daily Task ---
 export const completeDailyTask = async (
   taskId: string,
   devDayOffset: number = 0
@@ -261,38 +293,32 @@ export const completeDailyTask = async (
 
     const userRef = doc(db, "users", user.uid);
     const taskRef = doc(db, `users/${user.uid}/dailyTasks/${taskId}`);
-
-    // 1) Mark done
     await updateDoc(taskRef, { isCompleted: true });
 
-    // 2) Fetch user
     const snap = await getDoc(userRef);
     const u = snap.data() || {};
-
-    // 3) XP & level
-    let xp = (u.xp || 0) + 100;
-    let lvl = u.level || 1;
-    while (xp >= 1000) {
-      xp -= 1000;
-      lvl++;
-    }
-
-    // 4) Daily streak
     const now = addDays(new Date(), devDayOffset);
-    const last = u.lastDailyTaskCompletedAt
-      ? new Date(u.lastDailyTaskCompletedAt)
-      : null;
+    const last = u.lastDailyTaskCompletedAt ? new Date(u.lastDailyTaskCompletedAt) : null;
+
     let ds = u.dailyStreak || 0;
     if (last) {
-      const delta = Math.floor(
-        (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const delta = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
       ds = delta === 1 ? ds + 1 : 1;
     } else {
       ds = 1;
     }
 
-    // 5) Update Firestore
+    let xp = u.xp || 0;
+    let lvl = u.level || 1;
+    const multiplier = 1 + ds * 0.05;
+    const gainedXP = Math.floor(100 * multiplier);
+    xp += gainedXP;
+
+    while (xp >= 1000) {
+      xp -= 1000;
+      lvl++;
+    }
+
     await updateDoc(userRef, {
       xp,
       level: lvl,
@@ -300,7 +326,15 @@ export const completeDailyTask = async (
       lastDailyTaskCompletedAt: now.toISOString(),
     });
 
-    console.log("Daily task completed! XP rewarded, streak:", ds);
+    await checkAndUnlockAchievements(user.uid, {
+      xp,
+      level: lvl,
+      dailyStreak: ds,
+    });
+
+    console.log(
+      `✅ Daily task complete! XP gained: ${gainedXP}, Streak: ${ds}, XP: ${xp}, Level: ${lvl}`
+    );
     return { xp, level: lvl, dailyStreak: ds };
   } catch (error) {
     console.error("Error completing daily task:", error);

@@ -1,38 +1,17 @@
-// index.tsx
-
 import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  Button,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  FlatList,
-} from "react-native";
+import { View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, FlatList, Pressable,} from "react-native";
 import * as Progress from "react-native-progress";
 import { useNavigation, DrawerActions } from "@react-navigation/native";
 import { auth, db } from "../../config/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-} from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc,} from "firebase/firestore";
 import { getUserData } from "../../services/authService";
-import {
-  completeWeeklyTask,
-  setInitialWeeklyTask,
-  setWeeklyTask,
-  completeDailyTask,
-} from "../../services/firebaseService";
+import { completeWeeklyTask, setInitialWeeklyTask, setWeeklyTask, completeDailyTask, resetDailyStreakIfMissed,} from "../../services/firebaseService";
+import { checkAndUnlockAchievements } from "../../services/achievementService";
 import DailyTaskItem from "../../components/DailyTaskItem";
 import { addDays, format } from "date-fns";
+import { devDayOffset } from "../../config/devSettings";
+
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -40,6 +19,8 @@ export default function HomeScreen() {
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [dailyTasks, setDailyTasks] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [showAchievements, setShowAchievements] = useState(false);
 
   // Authenticate & initialize weekly task
   useEffect(() => {
@@ -47,13 +28,34 @@ export default function HomeScreen() {
       if (currentUser) {
         setUser(currentUser);
         try {
-          const data = await getUserData(currentUser);
+          let data = await getUserData(currentUser);
+  
           if (data) {
+            const streakReset = await resetDailyStreakIfMissed(
+              currentUser.uid,
+              data.lastDailyTaskCompletedAt,
+              data.dailyStreak,
+              devDayOffset
+            );
+  
+            if (streakReset) {
+              data.dailyStreak = 0; // locally reflect change
+            }
+  
             setUserData(data);
+            setAchievements(data.achievements || []); // Fetch achievements
+  
             if (!data.currentWeeklyTask) {
               await setInitialWeeklyTask();
               const refreshed = await getUserData(currentUser);
-              setUserData(refreshed);
+              if (refreshed) {
+                setUserData(refreshed);
+                setAchievements(refreshed.achievements || []); // Update achievements
+              } else {
+                console.error("Error: Refreshed user data is null.");
+                setUserData(null);
+                setAchievements([]);
+              }
             }
           }
         } catch (err) {
@@ -62,9 +64,12 @@ export default function HomeScreen() {
       } else {
         setUser(null);
         setUserData(null);
+        setAchievements([]); // Clear achievements
       }
+  
       setLoading(false);
     });
+  
     return () => unsubscribe();
   }, []);
 
@@ -74,12 +79,56 @@ export default function HomeScreen() {
       fetchTodaysTasks(user.uid);
     }
   }, [user, userData?.currentWeeklyTask]);
+  // Re-check and unlock achievements whenever userData updates
+  useEffect(() => {
+    if (userData) {
+      checkAndUnlockAchievements(user?.uid || "", {
+        xp: userData.xp,
+        level: userData.level,
+        dailyStreak: userData.dailyStreak,
+        roadmapComplete: userData.roadmapComplete,
+      })
+        .then(setAchievements)
+        .catch((err) => console.error("Error unlocking achievements:", err));
+    }
+  }, [userData]);
+
+  
+  useEffect(() => {
+    if (userData && typeof userData.achievements === "object" && userData.achievements !== null) {
+      const unlockedAchievements = Object.keys(userData.achievements).filter(
+        (key) => userData.achievements[key]
+      );
+      setAchievements(unlockedAchievements);
+    } else {
+      setAchievements([]); // Reset achievements if the data is invalid
+    }
+  }, [userData]);
+
+  useEffect(() => {
+    const fetchAchievements = async () => {
+      if (auth.currentUser) {
+        const userRef = doc(db, "users", auth.currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          const unlockedAchievements = Object.keys(userData.achievements || {}).filter(
+            (key) => userData.achievements[key]
+          );
+          setAchievements(unlockedAchievements);
+        }
+      }
+    };
+  
+    fetchAchievements();
+  }, [userData]);
+
 
   // Load today's daily tasks
   const fetchTodaysTasks = async (userId: string) => {
     setLoading(true);
     try {
-      const today = format(addDays(new Date(), 2), "yyyy-MM-dd");
+      const today = format(addDays(new Date(), devDayOffset), "yyyy-MM-dd");
       const dailyRef = collection(db, `users/${userId}/dailyTasks`);
       const q = query(dailyRef, where("taskDate", "==", today));
       const snap = await getDocs(q);
@@ -99,7 +148,7 @@ export default function HomeScreen() {
   // Complete a daily task
   const markTaskAsCompleted = async (taskId: string) => {
     try {
-      await completeDailyTask(taskId);
+      await completeDailyTask(taskId, devDayOffset);
       setDailyTasks((prev) =>
         prev.map((t) =>
           t.id === taskId ? { ...t, isCompleted: true } : t
@@ -145,74 +194,83 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+<FlatList
+  data={dailyTasks}
+  keyExtractor={(item) => item.id}
+  renderItem={({ item }) => (
+    <DailyTaskItem task={item} onComplete={markTaskAsCompleted} />
+  )}
+  ListHeaderComponent={
+    <>
       <TouchableOpacity
         style={styles.menuButton}
-        onPress={() =>
-          navigation.dispatch(DrawerActions.openDrawer() as any)
-        }
+        onPress={() => navigation.dispatch(DrawerActions.openDrawer() as any)}
       >
         <Text style={styles.menuText}>☰</Text>
       </TouchableOpacity>
 
-      {user && userData ? (
-        <View style={styles.profileCard}>
-          <Text style={styles.username}>{userData.name}</Text>
-          <Text>Level {userData.level}</Text>
-          <Progress.Bar
-            progress={userData.xp / 1000}
-            width={200}
+      <View style={styles.profileCard}>
+        <Text style={styles.username}>{userData.name}</Text>
+        <Text>Level {userData.level}</Text>
+        <Progress.Bar
+          progress={userData.xp / 1000}
+          width={200}
+          color="#007AFF"
+        />
+        <Text>{userData.xp} / 1000 XP</Text>
+        <Text>Streak: {userData.dailyStreak} days</Text>
+      </View>
+
+      <View style={styles.tasksHeader}>
+        <Text style={styles.tasksTitle}>Today's Tasks</Text>
+        <View style={styles.nextButtonContainer}>
+          <Button
+            title="Next Task"
+            onPress={() => user && handleNextTask(user.uid)}
             color="#007AFF"
           />
-          <Text>{userData.xp} / 1000 XP</Text>
-          <Text>Streak: {userData.dailyStreak} days</Text>
-
-          {/* Daily Tasks Section */}
-          <View style={styles.tasksSection}>
-            <Text style={styles.tasksTitle}>Today's Tasks</Text>
-            {dailyTasks.length === 0 ? (
-              <Text>No tasks for today! 🎉</Text>
-            ) : (
-              <FlatList
-                data={dailyTasks}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <DailyTaskItem
-                    task={item}
-                    onComplete={markTaskAsCompleted}
-                  />
-                )}
-              />
-            )}
-
-            {/* Next Task Button */}
-            <View style={styles.nextButtonContainer}>
-              <Button
-                title="Next Task"
-                onPress={() => handleNextTask(user.uid)}
-                color="#007AFF"
-              />
-            </View>
-          </View>
         </View>
-      ) : (
-        <View>
-          <Text>No user data available. Please log in.</Text>
-          <Button
-            title="Login"
-            onPress={() => navigation.navigate("Login" as any)}
-          />
-        </View>
+      </View>
+
+      {dailyTasks.length === 0 && (
+        <Text style={styles.noTasksText}>No tasks for today! 🎉</Text>
       )}
-    </ScrollView>
-  );
-}
+    </>
+  }
+  ListFooterComponent={
+    <View style={styles.achievementsSection}>
+      <Pressable onPress={() => setShowAchievements(!showAchievements)}>
+        <Text style={styles.achievementsTitle}>
+          {showAchievements ? "▼ Achievements" : "▶ Achievements"}
+        </Text>
+      </Pressable>
+  
+      {showAchievements && (
+        achievements.length > 0 ? (
+          achievements.map((achievement, index) => (
+            <Text key={index} style={styles.achievementItem}>
+              🎖 {achievement}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.noAchievementsText}>
+            No achievements unlocked yet.
+          </Text>
+        )
+      )}
+    </View>
+  }
+  
+/>
+    )}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     backgroundColor: "#fff",
+    alignItems: "center",
   },
   menuButton: {
     position: "absolute",
@@ -237,6 +295,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   tasksSection: {
+    paddingHorizontal: 20,
     marginTop: 20,
     width: "100%",
   },
@@ -247,5 +306,39 @@ const styles = StyleSheet.create({
   },
   nextButtonContainer: {
     marginTop: 20,
+    width: 200
+  },
+  tasksHeader: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 20,
+    width: "100%",
+  },
+  
+  noTasksText: {
+    paddingHorizontal: 20,
+    fontStyle: "italic",
+    marginTop: 10,
+  },
+  achievementsSection: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#f0f8ff",
+    borderRadius: 10,
+  },
+  achievementsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  achievementItem: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  noAchievementsText: {
+    fontStyle: "italic",
+    color: "#888",
   },
 });

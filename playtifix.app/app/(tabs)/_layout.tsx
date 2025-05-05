@@ -3,14 +3,14 @@ import React from "react";
 import { IconSymbol } from "@/components/ui/IconSymbol";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks/useColorScheme";
-import CustomSidebar from "@/components/CustomSidebar";  // Import the custom sidebar
+import CustomSidebar from "@/components/CustomSidebar";  
 
 export default function SidebarLayout() {
   const colorScheme = useColorScheme();
 
   return (
     <Drawer
-      drawerContent={(props) => <CustomSidebar {...props} />}  // Use custom sidebar
+      drawerContent={(props) => <CustomSidebar {...props} />} 
       screenOptions={{
         headerShown: true,
         drawerActiveTintColor: Colors[colorScheme ?? "dark"].tint,
@@ -28,13 +28,6 @@ export default function SidebarLayout() {
         options={{
           title: "Roadmap",
           drawerIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-      <Drawer.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          drawerIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
         }}
       />
     </Drawer>
