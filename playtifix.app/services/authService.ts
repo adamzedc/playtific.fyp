@@ -63,17 +63,11 @@ export const registerUser = async (
 // Login User
 export const loginUser = async (email: string, password: string) => {
   try {
-    console.log("Attempting to log in user:", email);
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-    console.log("User logged in successfully:", userCredential.user.uid);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error) {
-    console.error("Login error:", error);
-    return null;
+    console.error("Login error (authService):", error);
+    throw error; // Re-throw the error to be handled in the calling function
   }
 };
 

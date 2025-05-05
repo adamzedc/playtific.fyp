@@ -21,6 +21,7 @@ export default function HomeScreen() {
   const [dailyTasks, setDailyTasks] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   // Authenticate & initialize weekly task
   useEffect(() => {
@@ -210,15 +211,21 @@ export default function HomeScreen() {
       </TouchableOpacity>
 
       <View style={styles.profileCard}>
-        <Text style={styles.username}>{userData.name}</Text>
-        <Text>Level {userData.level}</Text>
-        <Progress.Bar
-          progress={userData.xp / 1000}
-          width={200}
-          color="#007AFF"
-        />
-        <Text>{userData.xp} / 1000 XP</Text>
-        <Text>Streak: {userData.dailyStreak} days</Text>
+        {userData ? (
+          <>
+            <Text style={styles.username}>{userData.name}</Text>
+            <Text>Level {userData.level}</Text>
+            <Progress.Bar
+              progress={userData.xp / 1000}
+              width={200}
+              color="#007AFF"
+            />
+            <Text>{userData.xp} / 1000 XP</Text>
+            <Text>Streak: {userData.dailyStreak} days</Text>
+          </>
+        ) : (
+          <Text style={styles.noUserText}>Please log in to see your profile.</Text>
+        )}
       </View>
 
       <View style={styles.tasksHeader}>
@@ -257,6 +264,27 @@ export default function HomeScreen() {
             No achievements unlocked yet.
           </Text>
         )
+      )}
+
+      <Pressable onPress={() => setShowInstructions(!showInstructions)}>
+        <Text style={styles.instructionsTitle}>
+          {showInstructions ? "▼ Instructions" : "▶ Instructions"}
+        </Text>
+      </Pressable>
+
+      {showInstructions && (
+        <View style={styles.instructionsContent}>
+          <Text style={styles.instructionsText}>
+            Welcome to the app! Here you can track your tasks, unlock achievements, and follow your roadmap to success.
+            Here is how to use the app:
+            (1) Click the navigation menu (beside home) to access different sections. Go to Roadmap and key in the details.
+            (2) Go back to home page. The daily task should be generated automatically.
+            (3) Spend 30 or however long you want on the task. Click on the green complete to mark it as completed.
+            (4) If you are not finished, the next daily task will be generated the next day.
+            (5) However, if you are done, click on the next task button to generate the next task.
+
+          </Text>
+        </View>
       )}
     </View>
   }
@@ -338,6 +366,21 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   noAchievementsText: {
+    fontStyle: "italic",
+    color: "#888",
+  },
+  instructionsTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  instructionsContent: {
+    marginTop: 10,
+  },
+  instructionsText: {
+    fontSize: 16,
+  },
+  noUserText: {
     fontStyle: "italic",
     color: "#888",
   },
