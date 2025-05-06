@@ -32,7 +32,7 @@ export default function HomeScreen() {
         setUser(currentUser);
         try {
           let data = await getUserData(currentUser);
-  
+          
           if (data) {
             const streakReset = await resetDailyStreakIfMissed(
               currentUser.uid,
@@ -44,10 +44,10 @@ export default function HomeScreen() {
             if (streakReset) {
               data.dailyStreak = 0; // locally reflect change
             }
-  
+            
             setUserData(data);
             setAchievements(data.achievements || []); // Fetch achievements
-  
+            // Check if the user has a current weekly task
             if (!data.currentWeeklyTask) {
               await setInitialWeeklyTask();
               const refreshed = await getUserData(currentUser);
@@ -96,7 +96,7 @@ export default function HomeScreen() {
     }
   }, [userData]);
 
-  
+  // Update achievements state when userData changes
   useEffect(() => {
     if (userData && typeof userData.achievements === "object" && userData.achievements !== null) {
       const unlockedAchievements = Object.keys(userData.achievements).filter(
@@ -108,6 +108,7 @@ export default function HomeScreen() {
     }
   }, [userData]);
 
+  // This effect runs when the userData changes, ensuring we always have the latest achievements
   useEffect(() => {
     const fetchAchievements = async () => {
       if (auth.currentUser) {
@@ -169,29 +170,30 @@ export default function HomeScreen() {
   // Advance to next weekly task manually
   const handleNextTask = async (userId: string) => {
     try {
-      // 1️⃣ mark the old weekly task complete
+      // mark the old weekly task complete
       await completeWeeklyTask();
   
-      // 2️⃣ re-fetch the updated user so `currentWeeklyTask` now points to the next one
+      // re-fetch the updated user so `currentWeeklyTask` now points to the next one
       const updated = await getUserData(auth.currentUser!);
       if (!updated?.currentWeeklyTask) {
         throw new Error("No next weekly task found in userData");
       }
   
-      // 3️⃣ generate the next week's daily tasks in Firestore
+      // generate the next week's daily tasks in Firestore
       //    pass in the full `currentWeeklyTask` object
       await setWeeklyTask(updated.currentWeeklyTask);  
   
-      // 4️⃣ pull back the new dailyTasks for today and refresh UI
+      // re-fetch today's tasks to show the new weekly task
+      //    this will also update the local state with the new task
       await fetchTodaysTasks(userId);
   
-      // 5️⃣ your existing streak‐update logic
+      // update the local userData state with the new weekly task
       const now = addDays(new Date(), devDayOffset);
       const last = updated.lastDailyTaskCompletedAt
         ? new Date(updated.lastDailyTaskCompletedAt)
         : null;
       let newStreak = updated.dailyStreak || 0;
-      if (
+      if (// Check if the last task was completed yesterday
         last &&
         now.getDate() === last.getDate() + 1 &&
         now.getMonth() === last.getMonth() &&
@@ -211,7 +213,7 @@ export default function HomeScreen() {
         lastDailyTaskCompletedAt: now.toISOString(),
       });
   
-      console.log(`✅ Weekly task complete! New streak: ${newStreak}`);
+      console.log(` Weekly task complete! New streak: ${newStreak}`);
     } catch (err) {
       console.error("Error advancing to next weekly task:", err);
       Alert.alert("Error", "Could not advance to the next task. Please try again.");

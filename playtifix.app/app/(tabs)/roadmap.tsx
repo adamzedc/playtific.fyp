@@ -41,6 +41,7 @@ export default function RoadmapScreen() {
 
       console.log("Fetching roadmaps for user:", user.uid);
       const roadmaps = await getUserRoadmaps();
+      // Check if roadmaps is an array
       setSavedRoadmaps(roadmaps || []);
       console.log("Fetched roadmaps:", roadmaps);
       setFetchingRoadmaps(false);
@@ -76,7 +77,7 @@ export default function RoadmapScreen() {
           milestoneIndex: 0,
           taskIndex: 0,
         });
-
+        // Update the local state with the new roadmap
         setSavedRoadmaps((prev) => [...prev, monthlyRoadmap]);
 
         Alert.alert("Success", "Roadmap generated and saved!");

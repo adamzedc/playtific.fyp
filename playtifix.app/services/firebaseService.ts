@@ -1,13 +1,5 @@
 import { auth, db } from "../config/firebaseConfig";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-} from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,} from "firebase/firestore";
 import { addDays, format } from "date-fns";
 import { devDayOffset } from "../config/devSettings";
 import { checkAndUnlockAchievements } from "./achievementService";
@@ -30,8 +22,7 @@ type Roadmap = {
   timeframe: string;
   milestones: Milestone[];
 };
-
-// --- Utility ---
+// --- Daily Streak Reset ---
 export const resetDailyStreakIfMissed = async (
   userId: string,
   lastCompletedDate: string | null,
@@ -52,7 +43,7 @@ export const resetDailyStreakIfMissed = async (
   return false;
 };
 
-// --- Daily Task Generator ---
+// --- Daily Task Generation ---
 export const generateDailyTasks = async ( weeklyTaskTitle: string, userId: string) => {
   try {
     const dailyTasksRef = collection(db, `users/${userId}/dailyTasks`);
@@ -70,12 +61,13 @@ export const generateDailyTasks = async ( weeklyTaskTitle: string, userId: strin
       });
     }
 
-    console.log("✅ Daily tasks generated in Firestore with offset:", devDayOffset);
+    console.log("Daily tasks generated in Firestore with offset:", devDayOffset);
   } catch (error) {
-    console.error("❌ Failed to generate daily tasks:", error);
+    console.error(" Failed to generate daily tasks:", error);
   }
 };
 
+// --- Weekly Task Setup ---
 export const setWeeklyTask = async ( newTask: any) => {
   try {
     const user = auth.currentUser;
@@ -106,24 +98,22 @@ export const setWeeklyTask = async ( newTask: any) => {
       roadmaps[roadmapIndex]?.milestones[milestoneIndex]?.tasks[taskIndex]?.title;
 
     if (!taskTitle) {
-      console.warn("⚠️ Task title missing. Daily task generation skipped.");
+      console.warn("Task title missing. Daily task generation skipped.");
       return;
     }
 
     // 4. Generate 7 daily tasks from offset
     await generateDailyTasks(taskTitle, user.uid);
 
-    console.log("✅ Weekly task set and daily tasks generated (with offset).");
+    console.log(" Weekly task set and daily tasks generated (with offset).");
   } catch (error) {
-    console.error("❌ Error setting weekly task:", error);
+    console.error(" Error setting weekly task:", error);
   }
 };
 
 
 // --- Roadmap Utilities ---
 
-
-// --- Roadmap CRUD ---
 
 export const addRoadmap = async (roadmap: Omit<Roadmap, "id">) => {
   try {
@@ -333,7 +323,7 @@ export const completeDailyTask = async (
     });
 
     console.log(
-      `✅ Daily task complete! XP gained: ${gainedXP}, Streak: ${ds}, XP: ${xp}, Level: ${lvl}`
+      ` Daily task complete! XP gained: ${gainedXP}, Streak: ${ds}, XP: ${xp}, Level: ${lvl}`
     );
     return { xp, level: lvl, dailyStreak: ds };
   } catch (error) {

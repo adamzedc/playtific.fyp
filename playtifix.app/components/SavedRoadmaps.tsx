@@ -29,6 +29,7 @@ export default function SavedRoadmaps({
             <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
           </Pressable>
           {expandedIndexes.includes(index) &&
+          // Check if milestones exist and are an array
             roadmap.milestones.map((milestone, mIndex) => (
               <View key={mIndex} style={styles.milestone}>
                 <Text style={styles.milestoneTitle}>{milestone.name}</Text>

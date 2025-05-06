@@ -17,7 +17,7 @@ export const registerUser = async (
       throw new Error("Username cannot be empty.");
     }
 
-    // 1) Create user in Firebase Auth
+    // Create user in Firebase Auth
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
@@ -26,10 +26,10 @@ export const registerUser = async (
     const user = userCredential.user;
     console.log("User registered successfully:", user.uid);
 
-    // 2) Set display name in Auth profile
+    //  Set display name in Auth profile
     await updateProfile(user, { displayName: name });
 
-    // 3) Store initial user data in Firestore
+    // Store initial user data in Firestore
     //    — note: we remove the old `streak` field and replace it with `dailyStreak`
     await setDoc(doc(db, "users", user.uid), {
       email: user.email || "",

@@ -8,7 +8,7 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [passwordError, setPasswordError] = useState("");
+  const [passwordError, setPasswordError] = useState("");// State to hold password error messages
   const [showPassword, setShowPassword] = useState(false); // State to toggle password visibility
 
   const handleSignup = async () => {
@@ -41,7 +41,7 @@ export default function SignupScreen() {
       }
 
       // If password is valid
-      console.log("✅ Password passed all checks");
+      console.log(" Password passed all checks");
 
       const user = await registerUser(email.trim(), password, name.trim());
 
