@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text,Alert } from "react-native";
-import RoadmapForm from "../../components/RoadmapForm";
-import RoadmapCard from "../../components/RoadmapCard";
-import SavedRoadmaps from "../../components/SavedRoadmaps";
+import { useEffect, useState } from "react";
+import { StyleSheet, Text, View, Button, ScrollView, ActivityIndicator, TextInput, Alert, Pressable,} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { generateRoadmap } from "../../services/openAIService";
 import { addRoadmap, getUserRoadmaps, setWeeklyTask } from "../../services/firebaseService";
 import { auth } from "../../config/firebaseConfig";
@@ -98,26 +96,74 @@ export default function RoadmapScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollView}>
-        <Text style={styles.title}>ai-powered roadmap</Text>
-        <Text style={styles.subtitle}>enter your goal and timeframe to generate a roadmap.</Text>
+        <Text style={styles.title}>AI-Powered Roadmap</Text>
+        <Text style={styles.subtitle}>Enter your goal and timeframe to generate a roadmap.</Text>
 
-        <RoadmapForm
-          goal={goal}
-          setGoal={setGoal}
-          timeframe={timeframe}
-          setTimeframe={setTimeframe}
-          handleGenerateRoadmap={handleGenerateRoadmap}
-          loading={loading}
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your goal (e.g., Learn React Native)"
+          value={goal}
+          onChangeText={setGoal}
         />
 
-        {roadmap && <RoadmapCard roadmap={roadmap} />}
-
-        <SavedRoadmaps
-          savedRoadmaps={savedRoadmaps}
-          fetchingRoadmaps={fetchingRoadmaps}
-          expandedIndexes={expandedIndexes}
-          toggleExpand={toggleExpand}
+        <TextInput
+          style={styles.input}
+          placeholder="Enter timeframe (e.g., 3 months)"
+          value={timeframe}
+          keyboardType="numeric"
+          onChangeText={setTimeframe}
         />
+
+        <Button title="Generate Roadmap" onPress={handleGenerateRoadmap} disabled={loading} />
+
+        {loading && <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />}
+
+        {roadmap && roadmap.milestones && roadmap.milestones.length > 0 && (
+          <View style={styles.roadmapContainer}>
+            <Text style={styles.goal}>{roadmap.goal}</Text>
+            <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
+
+            {roadmap.milestones.map((milestone, index) => (
+              <View key={index} style={styles.milestone}>
+                <Text style={styles.milestoneTitle}>{milestone.name}</Text>
+                {milestone.tasks.map((task, i) => (
+                  <Text key={i} style={styles.task}>• {task}</Text>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+
+        <Pressable onPress={() => setShowSaved(!showSaved)} style={styles.expandButton}>
+          <Text style={styles.expandButtonText}>{showSaved ? "Hide" : "Show"} Saved Roadmaps</Text>
+        </Pressable>
+
+        {showSaved && (
+          <View style={styles.roadmapContainer}>
+            {fetchingRoadmaps ? (
+              <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
+            ) : (savedRoadmaps && savedRoadmaps.length === 0 ? (
+              <Text>No saved roadmaps found.</Text>
+            ) : (
+              savedRoadmaps.map((roadmap, index) => (
+                <View key={roadmap.id || `roadmap-${index}`} style={styles.roadmapContainer}>
+                  <Pressable onPress={() => toggleExpand(index)}>
+                    <Text style={styles.goal}>{roadmap.goal}</Text>
+                    <Text style={styles.timeframe}>Timeframe: {roadmap.timeframe}</Text>
+                  </Pressable>
+                  {expandedIndexes.includes(index) && roadmap.milestones.map((milestone, mIndex) => (
+                    <View key={mIndex} style={styles.milestone}>
+                      <Text style={styles.milestoneTitle}>{milestone.name}</Text>
+                      {milestone.tasks.map((task, tIndex) => (
+                        <Text key={tIndex} style={styles.task}>• {typeof task === 'string' ? task : task.title}</Text>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              ))
+            ))}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -126,23 +172,86 @@ export default function RoadmapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f8ff",
+    backgroundColor: "#fff",
   },
   scrollView: {
     alignItems: "center",
     padding: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "600",
+    fontSize: 32,
+    fontWeight: "bold",
     textAlign: "center",
     marginBottom: 10,
-    color: "#333",
   },
   subtitle: {
-    fontSize: 16,
-    color: "#555",
+    fontSize: 18,
+    color: "#666",
     textAlign: "center",
     marginBottom: 20,
+  },
+  input: {
+    width: "90%",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginBottom: 10,
+    fontSize: 16,
+  },
+  loader: {
+    marginVertical: 20,
+  },
+  roadmapContainer: {
+    marginTop: 20,
+    width: "100%",
+    padding: 15,
+    borderRadius: 10,
+    backgroundColor: "#f8f8f8",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  goal: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  timeframe: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 10,
+    color: "#007AFF",
+  },
+  milestone: {
+    marginTop: 10,
+  },
+  milestoneTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  task: {
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 10,
+  },
+  savedRoadmapsTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginTop: 30,
+    marginBottom: 10,
+  },
+  expandButton: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  expandButtonText: {
+    color: "white",
+    fontWeight: "bold",
   },
 });
