@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, FlatList, Pressable,} from "react-native";
-import * as Progress from "react-native-progress";
+import { View, Text, Button, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, FlatList, SafeAreaView } from "react-native";
 import { useNavigation, DrawerActions } from "@react-navigation/native";
 import { auth, db } from "../../config/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -11,7 +10,10 @@ import { checkAndUnlockAchievements } from "../../services/achievementService";
 import DailyTaskItem from "../../components/DailyTaskItem";
 import { addDays, format } from "date-fns";
 import { devDayOffset } from "../../config/devSettings";
-
+import ProfileSection from "../../components/ProfileSection";
+import TasksHeader from "../../components/TasksHeader";
+import Achievements from "../../components/Achievements";
+import Instructions from "../../components/Instructions";
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -233,102 +235,49 @@ export default function HomeScreen() {
   }
 
   return (
-<FlatList
-  data={dailyTasks}
-  keyExtractor={(item) => item.id}
-  renderItem={({ item }) => (
-    <DailyTaskItem task={item} onComplete={markTaskAsCompleted} />
-  )}
-  ListHeaderComponent={
-    <>
-      <TouchableOpacity
-        style={styles.menuButton}
-        onPress={() => navigation.dispatch(DrawerActions.openDrawer() as any)}
-      >
-        <Text style={styles.menuText}>☰</Text>
-      </TouchableOpacity>
-
-      <View style={styles.profileCard}>
-        {userData ? (
-          <>
-            <Text style={styles.username}>{userData.name}</Text>
-            <Text>Level {userData.level}</Text>
-            <Progress.Bar
-              progress={userData.xp / 1000}
-              width={200}
-              color="#007AFF"
-            />
-            <Text>{userData.xp} / 1000 XP</Text>
-            <Text>Streak: {userData.dailyStreak} days</Text>
-          </>
-        ) : (
-          <Text style={styles.noUserText}>Please log in to see your profile.</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+      <FlatList
+        data={dailyTasks}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <DailyTaskItem task={item} onComplete={markTaskAsCompleted} />
         )}
-      </View>
+        ListHeaderComponent={
+          <>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() =>
+                navigation.dispatch(DrawerActions.openDrawer() as any)
+              }
+            >
+              <Text style={styles.menuText}>☰</Text>
+            </TouchableOpacity>
 
-      <View style={styles.tasksHeader}>
-        <Text style={styles.tasksTitle}>Today's Tasks</Text>
-        <View style={styles.nextButtonContainer}>
-          <Button
-            title="Complete current task"
-            onPress={() => user && handleNextTask(user.uid)}
-            color="#007AFF"
-          />
-        </View>
-      </View>
-
-      {dailyTasks.length === 0 && (
-        <Text style={styles.noTasksText}>No tasks for today! 🎉</Text>
-      )}
-    </>
-  }
-  ListFooterComponent={
-    <View style={styles.achievementsSection}>
-      <Pressable onPress={() => setShowAchievements(!showAchievements)}>
-        <Text style={styles.achievementsTitle}>
-          {showAchievements ? "▼ Achievements" : "▶ Achievements"}
-        </Text>
-      </Pressable>
-  
-      {showAchievements && (
-        achievements.length > 0 ? (
-          achievements.map((achievement, index) => (
-            <Text key={index} style={styles.achievementItem}>
-              🎖 {achievement}
-            </Text>
-          ))
-        ) : (
-          <Text style={styles.noAchievementsText}>
-            No achievements unlocked yet.
-          </Text>
-        )
-      )}
-
-      <Pressable onPress={() => setShowInstructions(!showInstructions)}>
-        <Text style={styles.instructionsTitle}>
-          {showInstructions ? "▼ Instructions" : "▶ Instructions"}
-        </Text>
-      </Pressable>
-
-      {showInstructions && (
-        <View style={styles.instructionsContent}>
-          <Text style={styles.instructionsText}>
-            Welcome to the app! Here you can track your tasks, unlock achievements, and follow your roadmap to success.
-            Here is how to use the app:
-            (1) Click the navigation menu (beside home) to access different sections. Go to Roadmap and key in the details.
-            (2) Go back to home page. The daily task should be generated automatically.
-            (3) Spend 30 or however long you want on the task. Click on the green complete to mark it as completed.
-            (4) If you are not finished, the next daily task will be generated the next day.
-            (5) However, if you are done, click on the next task button to generate the next task.
-
-          </Text>
-        </View>
-      )}
-    </View>
-  }
-  
-/>
-    )}
+            <ProfileSection userData={userData} />
+            <TasksHeader
+              user={user}
+              handleNextTask={handleNextTask}
+              dailyTasks={dailyTasks}
+            />
+          </>
+        }
+        ListFooterComponent={
+          <>
+            <Achievements
+              achievements={achievements}
+              showAchievements={showAchievements}
+              setShowAchievements={setShowAchievements}
+            />
+            <Instructions
+              showInstructions={showInstructions}
+              setShowInstructions={setShowInstructions}
+            />
+          </>
+        }
+      />
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -348,78 +297,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
   },
-  profileCard: {
-    width: "100%",
-    padding: 15,
-    backgroundColor: "#f8f8f8",
-    borderRadius: 10,
-    marginBottom: 20,
-    alignItems: "center",
-  },
-  username: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  tasksSection: {
-    paddingHorizontal: 20,
-    marginTop: 20,
-    width: "100%",
-  },
-  tasksTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  nextButtonContainer: {
-    marginTop: 20,
-    width: 200
-  },
-  tasksHeader: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 20,
-    width: "100%",
-  },
-  
   noTasksText: {
     paddingHorizontal: 20,
     fontStyle: "italic",
     marginTop: 10,
-  },
-  achievementsSection: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: "#f0f8ff",
-    borderRadius: 10,
-  },
-  achievementsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  achievementItem: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  noAchievementsText: {
-    fontStyle: "italic",
-    color: "#888",
-  },
-  instructionsTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  instructionsContent: {
-    marginTop: 10,
-  },
-  instructionsText: {
-    fontSize: 16,
-  },
-  noUserText: {
-    fontStyle: "italic",
-    color: "#888",
+    textAlign: "center",
   },
 });
