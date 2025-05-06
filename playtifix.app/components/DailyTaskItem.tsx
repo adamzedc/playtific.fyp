@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import * as Animatable from "react-native-animatable";
 
-
 interface DailyTask {
   id: string;
   taskDescription: string;
@@ -17,23 +16,22 @@ interface Props {
 const DailyTaskItem: React.FC<Props> = ({ task, onComplete }) => {
   return (
     <Animatable.View
-        animation={task.isCompleted ? "fadeIn" : undefined}
-        duration={500}
-        style={[styles.taskCard, task.isCompleted && styles.taskCompleted]}
+      animation={task.isCompleted ? "fadeIn" : undefined}
+      duration={500}
+      style={[styles.taskCard, task.isCompleted && styles.taskCompleted]}
+    >
+      <Text style={styles.taskText}>{task.taskDescription}</Text>
+      {!task.isCompleted ? (
+        <TouchableOpacity
+          style={styles.completeButton}
+          onPress={() => onComplete(task.id)}
         >
-        <Text style={styles.taskText}>{task.taskDescription}</Text>
-        {!task.isCompleted ? (
-            <TouchableOpacity
-            style={styles.completeButton}
-            onPress={() => onComplete(task.id)}
-            >
-            <Text style={styles.buttonText}>Complete</Text>
-            </TouchableOpacity>
-        ) : (
-            <Text style={styles.completedText}>Completed. See you tomorrow!</Text>
-        )}
+          <Text style={styles.buttonText}>Complete</Text>
+        </TouchableOpacity>
+      ) : (
+        <Text style={styles.completedText}>Completed. See you tomorrow!</Text>
+      )}
     </Animatable.View>
-
   );
 };
 
@@ -41,7 +39,7 @@ export default DailyTaskItem;
 
 const styles = StyleSheet.create({
   taskCard: {
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#f0f8ff",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -50,14 +48,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   taskCompleted: {
-    backgroundColor: "#d3ffd3",
+    backgroundColor: "#d3ffd3", // Light green for completed tasks
   },
   taskText: {
     flex: 1,
     fontSize: 16,
   },
   completeButton: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#4CAF50", // Green button
     padding: 10,
     borderRadius: 8,
     marginLeft: 10,
