@@ -1,50 +1,97 @@
-# Welcome to your Expo app 👋
+# Playtifix App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Overview
+Playtific is an AI-powered gamification app that helps users achieve their goals by generating personalized roadmaps. Users can input their goals and timeframes, and the app will create a roadmap with milestones and tasks. Gamification elements such as experience points (XP), levels, streaks, and achievements are integrated to keep users motivated and engaged.
 
-## Get started
+Features
+Core Features
+AI-Powered Roadmap Generation:
 
-1. Install dependencies
+Users input their goals and timeframes.
+The app generates monthly milestones and weekly tasks using OpenAI's API.
+Daily and Weekly Task Management:
 
+Daily tasks are derived from weekly tasks and tracked for completion.
+Weekly tasks are automatically assigned and updated.
+Gamification Elements:
+
+XP & Levels: Users earn XP for completing tasks and level up as they progress.
+Daily Streaks: Tracks consecutive days of task completion.
+Achievements: Unlock badges for milestones like maintaining streaks or completing roadmaps.
+Saved Roadmaps:
+
+Users can view and expand their saved roadmaps, including milestones and tasks.
+Authentication:
+
+Secure user authentication using Firebase Authentication.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
+
+## Overview
+
+Playtifix is built to streamline workflows and deliver a seamless user experience. Whether you're looking to improve productivity or integrate advanced functionalities into your application, Playtifix provides a solid foundation.
+
+
+## Installation
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v12 or higher)
+- [npm](https://www.npmjs.com/)
+
+npm install -g expo-cli
+
+### Steps
+
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/yourusername/playtifix.git
+   ```
+2. **Navigate into the Project Directory:**
+   ```bash
+   cd playtifix.app
+   ```
+3. **Install Dependencies:**
    ```bash
    npm install
    ```
-
-2. Start the app
-
+4. **Start the Application:**
    ```bash
-    npx expo start
+   npm start
    ```
 
-In the output, you'll find options to open the app in a
+## Usage
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+After installation, start the application and visit [http://localhost:3000](http://localhost:3000) in your browser. For more detailed instructions, refer to the [User Documentation](docs/USAGE.md).
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Contributing
 
-## Get a fresh project
+Contributions are welcome! To contribute:
 
-When you're ready, run:
+- Fork this repository.
+- Create a feature branch for your changes.
+- Adhere to the project's coding standards.
+- Submit a pull request with a detailed description of your improvements.
 
-```bash
-npm run reset-project
-```
+For more details, please see the [Contributing Guidelines](CONTRIBUTING.md).
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## License
 
-## Learn more
+This project is licensed under the [MIT License](LICENSE). Please review the LICENSE file for more details.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Contact
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+For questions or support, please reach out via email at [email@example.com](mailto:email@example.com) or open an issue on GitHub.
 
-## Join the community
+Happy coding!
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+notes
+- to update date manually, go tp desSetting.ts under config and add 1 to the right 0, save then the app should simulate 1 day has passed.
