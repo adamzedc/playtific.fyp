@@ -169,45 +169,42 @@ export default function HomeScreen() {
   // Advance to next weekly task manually
   const handleNextTask = async (userId: string) => {
     try {
-      // Complete the current weekly task
+      // 1️⃣ mark the old weekly task complete
       await completeWeeklyTask();
   
-      // Fetch the updated user data
+      // 2️⃣ re-fetch the updated user so `currentWeeklyTask` now points to the next one
       const updated = await getUserData(auth.currentUser!);
-  
-      const now = new Date();
-      now.setDate(now.getDate() + devDayOffset); // Apply devDayOffset for testing
-  
-      const lastCompletedAt = updated?.lastDailyTaskCompletedAt
-        ? new Date(updated.lastDailyTaskCompletedAt)
-        : null;
-  
-      let newStreak = updated?.dailyStreak || 0;
-  
-      // Check if the task is completed on the same day or the next consecutive day
-      if (
-        lastCompletedAt &&
-        (now.getDate() === lastCompletedAt.getDate() + 1 &&
-          now.getMonth() === lastCompletedAt.getMonth() &&
-          now.getFullYear() === lastCompletedAt.getFullYear())
-      ) {
-        newStreak += 1; // Increment streak
-      } else if (
-        !lastCompletedAt ||
-        now.getDate() !== lastCompletedAt.getDate() ||
-        now.getMonth() !== lastCompletedAt.getMonth() ||
-        now.getFullYear() !== lastCompletedAt.getFullYear()
-      ) {
-        newStreak = 1; // Reset streak if not consecutive
+      if (!updated?.currentWeeklyTask) {
+        throw new Error("No next weekly task found in userData");
       }
   
-      // Update Firestore with the new streak
+      // 3️⃣ generate the next week's daily tasks in Firestore
+      //    pass in the full `currentWeeklyTask` object
+      await setWeeklyTask(updated.currentWeeklyTask);  
+  
+      // 4️⃣ pull back the new dailyTasks for today and refresh UI
+      await fetchTodaysTasks(userId);
+  
+      // 5️⃣ your existing streak‐update logic
+      const now = addDays(new Date(), devDayOffset);
+      const last = updated.lastDailyTaskCompletedAt
+        ? new Date(updated.lastDailyTaskCompletedAt)
+        : null;
+      let newStreak = updated.dailyStreak || 0;
+      if (
+        last &&
+        now.getDate() === last.getDate() + 1 &&
+        now.getMonth() === last.getMonth() &&
+        now.getFullYear() === last.getFullYear()
+      ) {
+        newStreak++;
+      } else {
+        newStreak = 1;
+      }
       await updateDoc(doc(db, "users", userId), {
         dailyStreak: newStreak,
         lastDailyTaskCompletedAt: now.toISOString(),
       });
-  
-      // Update local state
       setUserData({
         ...updated,
         dailyStreak: newStreak,
@@ -217,12 +214,10 @@ export default function HomeScreen() {
       console.log(`✅ Weekly task complete! New streak: ${newStreak}`);
     } catch (err) {
       console.error("Error advancing to next weekly task:", err);
-      Alert.alert(
-        "Error",
-        "Could not advance to the next task. Please try again."
-      );
+      Alert.alert("Error", "Could not advance to the next task. Please try again.");
     }
   };
+  
   
 
   if (loading) {
